@@ -46,6 +46,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_instructor' => 'boolean',
+        'status' => 'boolean',
     ];
 
     public function isAdmin(): bool

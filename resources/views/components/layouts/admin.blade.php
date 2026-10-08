@@ -123,9 +123,9 @@
 
                     <div class="flex items-center gap-2.5 pl-4 border-l border-slate-200">
                         <div class="h-9 w-9 rounded-full bg-brand-900 text-white flex items-center justify-center font-semibold text-sm">
-                            {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
+                            {{ strtoupper(substr(current_admin_user()->name ?? 'A', 0, 1)) }}
                         </div>
-                        <span class="hidden sm:inline text-sm font-semibold text-slate-700">{{ auth()->user()->name ?? 'Admin' }}</span>
+                        <span class="hidden sm:inline text-sm font-semibold text-slate-700">{{ current_admin_user()->name ?? 'Admin' }}</span>
                         <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                     </div>
                 </div>

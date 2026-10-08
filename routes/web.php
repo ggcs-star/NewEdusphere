@@ -10,7 +10,6 @@ use App\Http\Controllers\Admin\RevenueController;
 use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Auth\TempLoginController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
@@ -137,6 +136,10 @@ Route::middleware('web.auth')->group(function () {
     */
 
     Route::get('/dashboard', function () {
+        if (current_admin_user()?->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
         return view('dashboard.index');
     })->name('dashboard');
 
@@ -165,12 +168,8 @@ Route::middleware('web.auth')->group(function () {
     ])->name('logout');
 
 });
-// TEMPORARY — remove once the real auth flow (login/register/forgot) is merged.
-Route::get('/login1', [TempLoginController::class, 'create'])->name('login')->middleware('guest');
-Route::post('/login1', [TempLoginController::class, 'store'])->middleware('guest');
-Route::post('/logout1', [TempLoginController::class, 'destroy'])->name('logout')->middleware('auth');
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Categories

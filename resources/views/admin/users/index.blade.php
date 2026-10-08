@@ -57,16 +57,16 @@
                             <td class="px-5 py-3.5 text-slate-600">{{ $user->courses_count }}</td>
                             <td class="px-5 py-3.5 text-slate-600">{{ $user->enrollments_count }}</td>
                             <td class="px-5 py-3.5">
-                                <x-admin.badge :color="$user->status === 'active' ? 'emerald' : 'rose'">{{ ucfirst($user->status) }}</x-admin.badge>
+                                <x-admin.badge :color="$user->status ? 'emerald' : 'rose'">{{ $user->status ? 'Active' : 'Suspended' }}</x-admin.badge>
                             </td>
                             <td class="px-5 py-3.5">
                                 <div class="flex items-center justify-end gap-1.5">
                                     <form action="{{ route('admin.users.toggle-status', $user) }}" method="POST">
                                         @csrf
                                         <button type="submit"
-                                            class="h-8 w-8 rounded-lg flex items-center justify-center {{ $user->status === 'active' ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' }}"
-                                            title="{{ $user->status === 'active' ? 'Suspend' : 'Activate' }}">
-                                            <i class="fa-solid {{ $user->status === 'active' ? 'fa-ban' : 'fa-check' }} text-xs"></i>
+                                            class="h-8 w-8 rounded-lg flex items-center justify-center {{ $user->status ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' }}"
+                                            title="{{ $user->status ? 'Suspend' : 'Activate' }}">
+                                            <i class="fa-solid {{ $user->status ? 'fa-ban' : 'fa-check' }} text-xs"></i>
                                         </button>
                                     </form>
                                     <a href="{{ route('admin.users.edit', $user) }}" class="h-8 w-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center" title="Edit">

@@ -309,7 +309,7 @@ public function showResetPassword(Request $request)
                 );
         }
 
-        return view('auth.verify-device');
+        return view('auth.device-verification');
     }
 
     /*
