@@ -9,6 +9,7 @@ use App\Models\Lesson;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class CourseSeeder extends Seeder
@@ -26,7 +27,7 @@ class CourseSeeder extends Seeder
             ['email' => 'anuj.singh@edusphere.test'],
             [
                 'name' => 'Anuj Singh',
-                'password' => 'Instructor@123',
+                'password' => Hash::make('Instructor@123'),
                 'role' => 'user',
                 'is_instructor' => true,
                 'status' => true,
@@ -36,12 +37,12 @@ class CourseSeeder extends Seeder
 
         $studentOne = User::updateOrCreate(
             ['email' => 'priya.sharma@edusphere.test'],
-            ['name' => 'Priya Sharma', 'password' => 'Student@123', 'role' => 'user', 'status' => true]
+            ['name' => 'Priya Sharma', 'password' => Hash::make('Student@123'), 'role' => 'user', 'status' => true]
         );
 
         $studentTwo = User::updateOrCreate(
             ['email' => 'rahul.verma@edusphere.test'],
-            ['name' => 'Rahul Verma', 'password' => 'Student@123', 'role' => 'user', 'status' => true]
+            ['name' => 'Rahul Verma', 'password' => Hash::make('Student@123'), 'role' => 'user', 'status' => true]
         );
 
         $category = Category::firstOrCreate(
