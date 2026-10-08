@@ -58,6 +58,7 @@ class Kernel extends HttpKernel
         */
 
         'auth' => \App\Http\Middleware\Authenticate::class,
+        'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
 
         'web.auth' => \App\Http\Middleware\WebAuthMiddleware::class,
 
