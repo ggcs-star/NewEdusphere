@@ -29,7 +29,7 @@
                     @forelse ($enrollments as $enrollment)
                         <tr class="hover:bg-brand-50/30 transition">
                             <td class="px-5 py-3.5">
-                                <p class="text-lg font-semibold text-brand-950">{{ $enrollment->user->name ?? '—' }}</p>
+                                <p class="text-sm font-semibold text-brand-950">{{ $enrollment->user->name ?? '—' }}</p>
                                 <p class="text-xs text-slate-400">{{ $enrollment->user->email ?? '' }}</p>
                             </td>
                             <td class="px-5 py-3.5 text-slate-600">{{ $enrollment->course->title ?? '—' }}</td>

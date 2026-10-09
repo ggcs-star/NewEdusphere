@@ -104,6 +104,22 @@ class CourseController extends BaseAdminController
         }, 'Course created. Now add sections and lessons.', 'admin.courses.index');
     }
 
+    public function show(Course $course): View
+    {
+        $course->load(['instructor', 'category', 'subCategory'])
+            ->loadCount(['sections', 'lessons']);
+
+        return view('admin.courses.show', [
+            'course' => $course,
+            'students' => $course->enrollments()
+                ->with('user')
+                ->latest()
+                ->get()
+                ->pluck('user')
+                ->filter(),
+        ]);
+    }
+
     public function edit(Course $course): View
     {
         return view('admin.courses.form', [

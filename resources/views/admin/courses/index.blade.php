@@ -203,6 +203,9 @@
                                                 <i class="fa-solid fa-xmark text-xs"></i>
                                             </button>
                                         @endif
+                                        <a href="{{ route('admin.courses.show', $course) }}" class="h-8 w-8 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center" title="Details">
+                                            <i class="fa-solid fa-eye text-xs"></i>
+                                        </a>
                                         <a href="{{ route('admin.courses.builder', $course) }}" class="h-8 w-8 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center" title="Manage Content">
                                             <i class="fa-solid fa-layer-group text-xs"></i>
                                         </a>

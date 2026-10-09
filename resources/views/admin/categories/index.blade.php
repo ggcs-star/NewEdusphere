@@ -92,9 +92,10 @@
                         <div class="pt-9 pb-5 px-5 flex-1 flex flex-col">
                             <div class="flex items-center justify-between gap-2">
                                 <h3 class="text-lg font-bold text-brand-950">{{ $category->name }}</h3>
-                                <span class="h-8 w-8 flex-shrink-0 rounded-full bg-brand-50 text-brand-700 flex items-center justify-center">
+                                <a href="{{ route('admin.categories.show', $category) }}" title="Details"
+                                    class="h-8 w-8 flex-shrink-0 rounded-full bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center transition">
                                     <i class="fa-solid fa-arrow-right text-xs"></i>
-                                </span>
+                                </a>
                             </div>
                             <span class="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
                                 <i class="fa-solid fa-folder text-[10px]"></i>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Concerns\GeneratesUniqueSlugs;
 use App\Models\Category;
+use App\Models\Course;
 use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,25 @@ class CategoryController extends BaseAdminController
             'allCategories' => Category::topLevel()->orderBy('name')->get(),
             'search' => $search ?? '',
             'selectedStatus' => $status,
+        ]);
+    }
+
+    public function show(Category $category): View
+    {
+        $category->load('children', 'parent');
+
+        $categoryIds = $category->children->isNotEmpty()
+            ? $category->children->pluck('id')->push($category->id)
+            : [$category->id];
+
+        return view('admin.categories.show', [
+            'category' => $category,
+            'courses' => Course::with(['instructor', 'category', 'subCategory'])
+                ->withCount('enrollments')
+                ->where(fn ($q) => $q->whereIn('category_id', $categoryIds)
+                    ->orWhereIn('sub_category_id', $categoryIds))
+                ->latest()
+                ->get(),
         ]);
     }
 

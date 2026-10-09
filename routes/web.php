@@ -175,6 +175,7 @@ Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group
     // Categories
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+    Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
     Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
 
@@ -183,6 +184,7 @@ Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group
     Route::get('/courses/pending', [CourseController::class, 'pending'])->name('courses.pending');
     Route::get('/courses/create', [CourseController::class, 'create'])->name('courses.create');
     Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
+    Route::get('/courses/{course}', [CourseController::class, 'show'])->name('courses.show');
     Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])->name('courses.edit');
     Route::put('/courses/{course}', [CourseController::class, 'update'])->name('courses.update');
     Route::delete('/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
@@ -210,9 +212,10 @@ Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-    Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::patch('/users/{user}/status', [UserController::class, 'updateStatus'])->name('users.update-status');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
     // Enrollment history

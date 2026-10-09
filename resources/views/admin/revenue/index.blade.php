@@ -49,7 +49,7 @@
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($payments as $payment)
                         <tr class="hover:bg-brand-50/30 transition">
-                            <td class="px-5 py-3.5 text-lg font-semibold text-brand-950">{{ $payment->user->name ?? '—' }}</td>
+                            <td class="px-5 py-3.5 text-sm font-semibold text-brand-950">{{ $payment->user->name ?? '—' }}</td>
                             <td class="px-5 py-3.5 text-slate-600 truncate max-w-xs" title="{{ $payment->course->title ?? '' }}">{{ $payment->course->title ?? '—' }}</td>
                             <td class="px-5 py-3.5"><x-admin.badge color="brand">{{ ucfirst($payment->payment_method) }}</x-admin.badge></td>
                             <td class="px-5 py-3.5 font-semibold text-brand-950">${{ number_format($payment->amount, 2) }}</td>
