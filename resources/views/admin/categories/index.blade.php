@@ -12,7 +12,7 @@
                 <div class="flex items-center gap-8">
                     {{-- Decorative cluster --}}
                     <div class="hidden lg:block relative w-20 h-20 flex-shrink-0">
-                        <div class="h-20 w-20 rounded-3xl bg-brand-700 rotate-6 shadow-xl flex items-center justify-center">
+                        <div class="h-20 w-20 rounded-3xl bg-brand-500 rotate-6 shadow-xl flex items-center justify-center">
                             <i class="fa-solid fa-graduation-cap text-3xl text-accent-400 -rotate-6"></i>
                         </div>
                         <div class="absolute -bottom-3 -left-4 h-10 w-14 rounded-xl bg-accent-500 shadow-lg flex items-center justify-center -rotate-12">
@@ -58,7 +58,7 @@
                 @foreach ($categories as $category)
                     <div class="relative rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-lg transition overflow-visible flex flex-col">
                         {{-- Header --}}
-                        <div class="relative h-24 rounded-t-2xl bg-gradient-to-br from-brand-700 to-brand-900 overflow-hidden">
+                        <div class="relative h-24 rounded-t-2xl bg-brand-500 overflow-hidden">
                             @if ($category->thumbnail)
                                 <img src="{{ Storage::url($category->thumbnail) }}" alt="{{ $category->name }}" class="absolute inset-0 h-full w-full object-cover opacity-40">
                             @endif

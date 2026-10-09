@@ -22,9 +22,9 @@
   --err:#e5484d;
   --ok:#16a34a;
 }
-html,body{height:100%}
-body{font-family:'Poppins',system-ui,sans-serif;color:var(--t);background:#fff;overflow-x:hidden}
-.login-container{display:flex;min-height:100vh}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Poppins',system-ui,sans-serif;color:var(--t);background:#fff}
+.login-container{display:flex;height:100vh}
 
 /* =========================================
    LEFT PANEL
@@ -64,19 +64,19 @@ body{font-family:'Poppins',system-ui,sans-serif;color:var(--t);background:#fff;o
 }
 
 .brand-logo{display:flex;align-items:center;gap:14px;position:relative;z-index:3}
-.brand-logo-icon{width:54px;height:54px;border-radius:14px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(4px);display:grid;place-items:center;box-shadow:0 8px 20px rgba(0,0,0,.15)}
+.brand-logo-icon{width:54px;height:54px;border-radius:14px;background:#fff;display:grid;place-items:center;box-shadow:0 8px 20px rgba(0,0,0,.2)}
 .brand-logo h1{font-size:28px;font-weight:800;line-height:1}
 .brand-logo h1 span{color:var(--o)}
 .brand-logo p{font-size:13px;opacity:.85;margin-top:4px}
 
 .brand-body{display:flex;flex:1;align-items:center;gap:24px;position:relative;z-index:3}
 .brand-text{flex:0 0 44%}
-.brand-small-title{font-size:30px;font-weight:600;margin-top:24px}
-.brand-heading h2{font-size:64px;font-weight:800;color:var(--o);line-height:1.05;margin-bottom:16px;text-shadow:0 4px 20px rgba(255,176,0,0.2)}
+.brand-small-title{font-size:20px;font-weight:600;margin-top:12px}
+.brand-heading h2{font-size:38px;font-weight:800;color:var(--o);line-height:1.1;margin-bottom:10px;text-shadow:0 4px 20px rgba(255,176,0,0.2)}
 .brand-description{font-size:15px;line-height:1.7;opacity:.9;max-width:340px}
 .brand-features{margin-top:30px;display:grid;gap:16px}
 .feature-item{display:flex;align-items:center;gap:14px}
-.feature-icon{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);display:grid;place-items:center;flex-shrink:0;backdrop-filter:blur(4px)}
+.feature-icon{width:44px;height:44px;border-radius:12px;background:var(--p-bright);box-shadow:0 6px 16px rgba(91,46,224,0.35);display:grid;place-items:center;flex-shrink:0}
 .feature-item h3{font-size:15px;font-weight:600}
 .feature-item p{font-size:12.5px;opacity:.8}
 
@@ -119,13 +119,18 @@ margin-bottom: -100px;
 .fb-2{bottom:12%;right:2%;background:#fff;animation-delay:1.5s}
 @keyframes float{50%{transform:translateY(-10px)}}
 
-.journey-text{font-family:'Caveat',cursive;font-size:28px;line-height:1.2;position:relative;z-index:3;text-shadow:0 2px 10px rgba(0,0,0,0.2)}
+/* Corner badge cluster — purple circle + orange square, floating independently top-right */
+.corner-badge-purple{position:absolute;top:5%;right:9%;width:76px;height:76px;border-radius:50%;background:var(--p-bright);display:grid;place-items:center;box-shadow:0 16px 32px rgba(91,46,224,0.45);z-index:4;animation:float 4.5s ease-in-out infinite}
+.corner-badge-orange{position:absolute;top:19%;right:3%;width:52px;height:52px;border-radius:14px;background:var(--o);display:grid;place-items:center;box-shadow:0 12px 24px rgba(0,0,0,.2);z-index:4;animation:float 4.5s ease-in-out infinite;animation-delay:1.2s}
+
+.journey-text{font-family:'Caveat',cursive;font-size:28px;line-height:1.2;position:relative;z-index:3;text-shadow:0 2px 10px rgba(0,0,0,0.2);margin-top:18px}
 .journey-text strong{color:var(--o)}
 
 /* Decorative Elements */
 .brand-decoration{position:absolute;border-radius:50%;z-index:1;pointer-events:none}
 .decoration-one{width:380px;height:380px;background:rgba(255,255,255,.03);bottom:-140px;left:-120px;filter:blur(40px)}
 .decoration-two{width:220px;height:220px;background:var(--o2);opacity:.8;top:-90px;right:-70px;filter:blur(30px)}
+.decoration-three{width:200px;height:200px;background:var(--o2);opacity:.55;top:-80px;left:-80px;filter:blur(25px)}
 .dots{position:absolute;z-index:1;width:120px;height:90px;background-image:radial-gradient(rgba(255,255,255,.35) 2px,transparent 2px);background-size:16px 16px;opacity:0.6}
 .dots-1{top:110px;right:42%}
 .dots-2{bottom:40px;right:60px}
@@ -139,7 +144,7 @@ margin-bottom: -100px;
   display:flex;
   align-items:center;
   justify-content:center;
-  padding:40px 32px;
+  padding:clamp(10px,3vh,32px) 32px;
   background: linear-gradient(135deg, #ffffff 0%, #FCFBFF 100%);
   position:relative;
   overflow:hidden;
@@ -181,8 +186,8 @@ margin-bottom: -100px;
   margin-bottom: 6px;
 }
 
-.login-heading h2{font-size:30px;font-weight:700;margin:0 0 8px;color: #24105F; letter-spacing:-0.5px;}
-.login-heading p{color:var(--m);font-size:14.5px;line-height:1.6;margin-bottom:28px}
+.login-heading h2{font-size:26px;font-weight:700;margin:0 0 4px;color: #24105F; letter-spacing:-0.5px;}
+.login-heading p{color:var(--m);font-size:13.5px;line-height:1.4;margin-bottom:clamp(6px,1.6vh,14px)}
 
 /* Alerts */
 .auth-alert{display:none;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;font-size:13.5px;margin-bottom:18px;line-height:1.5}
@@ -191,13 +196,13 @@ margin-bottom: -100px;
 .auth-alert-success{background:#e8f8ee;color:#12632f;border:1px solid #bfe9cf}
 
 /* Form Inputs */
-.form-group{margin-bottom:18px}
-.form-group label{display:block;font-size:13.5px;font-weight:500;margin-bottom:8px;color:#333}
+.form-group{margin-bottom:clamp(6px,1.4vh,10px)}
+.form-group label{display:block;font-size:12.5px;font-weight:500;margin-bottom:4px;color:#333}
 .input-wrapper{position:relative}
 .input-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9a98ad;display:flex;pointer-events:none}
 .input-wrapper input{
   width:100%;
-  height:54px;
+  height:clamp(38px,6vh,44px);
   border:1px solid #E3E0EF;
   border-radius:12px;
   padding:0 48px;
@@ -225,7 +230,7 @@ a{color:var(--p-bright);font-weight:600;text-decoration:none}
 a:hover{text-decoration:underline}
 
 /* Buttons */
-.btn{width:100%;height:54px;border-radius:12px;font:inherit;font-size:15.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:all .2s}
+.btn{width:100%;height:clamp(38px,6vh,44px);border-radius:12px;font:inherit;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:all .2s}
 .btn-primary{
   border:0;
   color:#fff;
@@ -245,7 +250,7 @@ a:hover{text-decoration:underline}
 .loading .btn-arrow{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.divider{display:flex;align-items:center;gap:14px;color:#a3a1b5;font-size:12.5px;font-weight:500;margin:22px 0}
+.divider{display:flex;align-items:center;gap:14px;color:#a3a1b5;font-size:12.5px;font-weight:500;margin:clamp(6px,1.6vh,10px) 0}
 .divider:before,.divider:after{content:"";flex:1;height:1px;background:var(--b)}
 
 .btn-google{
@@ -262,7 +267,7 @@ a:hover{text-decoration:underline}
   box-shadow: 0 4px 12px rgba(0,0,0,0.04);
 }
 
-.register-text{text-align:center;margin-top:26px;font-size:14px;color:var(--m)}
+.register-text{text-align:center;margin-top:clamp(6px,1.6vh,10px);font-size:13.5px;color:var(--m)}
 
 /* =========================================
    RESPONSIVE
@@ -273,56 +278,20 @@ a:hover{text-decoration:underline}
   .login-brand-panel{flex-basis:50%}
 }
 @media (max-width:860px){
- .login-container{flex-direction:column}
+ html,body{overflow:auto}
+ .login-container{flex-direction:column;height:auto;min-height:100vh}
  .login-brand-panel{flex:none;padding:28px 24px}
  .brand-features,.brand-description,.journey-text,.dots,.curve{display:none}
- .brand-small-title{font-size:18px;margin-top:18px}
- .brand-heading h2{font-size:38px;margin:0}
- .login-form-panel{padding:32px 20px 48px}
+ .brand-small-title{font-size:16px;margin-top:14px}
+ .brand-heading h2{font-size:30px;margin:0}
+ .login-form-panel{padding:32px 20px 48px;overflow:visible}
 }
 </style>
 </head>
 <body>
 <div class="login-container">
 
-  {{-- LEFT BRANDING PANEL --}}
-  <section class="login-brand-panel" aria-label="EduSphere">
-    <div class="brand-logo">
-      <div class="brand-logo-icon">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="#5b2ee0"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3z"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z" fill="#ffb020"/></svg>
-      </div>
-      <div><h1>Edu<span>Sphere</span></h1><p>Learn &bull; Grow &bull; Build Your Future</p></div>
-    </div>
-
-    <div class="brand-body">
-      <div class="brand-text">
-        <div class="brand-heading">
-          <p class="brand-small-title">Start Your</p>
-          <h2>Journey</h2>
-          <p class="brand-description">Create an account to access a wide range of courses, track your progress and achieve your goals with EduSphere.</p>
-        </div>
-        <div class="brand-features">
-          <div class="feature-item"><div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#ffb020"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3z"/></svg></div><div><h3>Expert Instructors</h3><p>Learn from industry professionals</p></div></div>
-          <div class="feature-item"><div class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#ffb020"><path d="M8 5v14l11-7z"/></svg></div><div><h3>Video Lessons</h3><p>Learn at your own pace</p></div></div>
-          <div class="feature-item"><div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffb020" stroke-width="2"><circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/></svg></div><div><h3>Certificates</h3><p>Showcase your skills</p></div></div>
-          <div class="feature-item"><div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="#ffb020"><path d="M4 20h3V10H4v10zm6 0h3V4h-3v16zm6 0h3v-7h-3v7z"/></svg></div><div><h3>Track Progress</h3><p>Stay on top of your learning</p></div></div>
-        </div>
-      </div>
-
-      <div class="brand-illustration">
-        <div class="float-badge fb-1"><svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3z"/></svg></div>
-        <img src="{{ asset('images/hero-student.jpg') }}" alt="Student learning on a laptop with books and course dashboard">
-        <div class="float-badge fb-2"><svg width="26" height="26" viewBox="0 0 24 24" fill="#5b2ee0"><path d="M8 5v14l11-7z"/></svg></div>
-      </div>
-    </div>
-
-    <div class="journey-text">Your Learning Journey<br><strong>Starts Here &rarr;</strong></div>
-
-    <div class="brand-decoration decoration-one"></div>
-    <div class="brand-decoration decoration-two"></div>
-    <div class="dots dots-1"></div><div class="dots dots-2"></div>
-    <svg class="curve" width="260" height="80" viewBox="0 0 260 80" fill="none"><path d="M2 70C60 10 140 90 258 8" stroke="#fff" stroke-width="2" stroke-dasharray="6 8"/></svg>
-  </section>
+  @include('auth.partials.brand-panel')
 
   {{-- RIGHT REGISTER PANEL --}}
   <section class="login-form-panel">
@@ -376,7 +345,7 @@ a:hover{text-decoration:underline}
           <span class="field-error" id="passwordConfirmationError"></span>
         </div>
 
-        <button type="submit" class="btn btn-primary" id="registerBtn" style="margin-top: 10px;">
+        <button type="submit" class="btn btn-primary" id="registerBtn" style="margin-top: 4px;">
           <span class="spinner"></span>
           <span id="registerBtnText">Register</span>
           <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>

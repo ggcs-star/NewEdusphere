@@ -34,7 +34,7 @@
                 <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
                     <div class="flex items-center justify-between gap-3 bg-brand-50/60 px-5 py-3.5">
                         <div class="flex items-center gap-3">
-                            <span class="h-7 w-7 rounded-full bg-brand-700 text-white text-xs font-bold flex items-center justify-center">{{ $loop->iteration }}</span>
+                            <span class="h-7 w-7 rounded-full bg-brand-500 text-white text-xs font-bold flex items-center justify-center">{{ $loop->iteration }}</span>
                             <h3 class="font-semibold text-brand-950">{{ $section->title }}</h3>
                             <span class="text-xs text-slate-400">{{ $section->lessons->count() }} lessons</span>
                         </div>

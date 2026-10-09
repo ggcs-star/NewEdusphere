@@ -20,21 +20,21 @@
 
         {{-- Sidebar --}}
         <aside
-            class="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 bg-brand-950 text-white transition-all duration-200"
+            class="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 bg-brand-500 text-white transition-all duration-200"
             :class="collapsed ? 'lg:w-20' : 'lg:w-64'"
         >
-            <div class="flex items-center h-16 border-b border-white/10" :class="collapsed ? 'justify-center px-0' : 'gap-2.5 px-6'">
+            <div class="flex items-center h-16 border-b border-white/15" :class="collapsed ? 'justify-center px-0' : 'gap-2.5 px-6'">
                 <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-accent-500 text-white">
                     <i class="fa-solid fa-graduation-cap text-base"></i>
                 </div>
                 <span x-show="!collapsed" x-transition.opacity x-cloak class="font-extrabold text-lg tracking-tight whitespace-nowrap overflow-hidden">
-                    <span class="text-white">Edu</span><span class="text-accent-500">Sphere</span>
+                    <span class="text-white">Edu</span><span class="text-accent-400">Sphere</span>
                 </span>
             </div>
 
             <nav class="relative flex-1 overflow-y-auto overflow-x-hidden admin-scroll px-3 py-6 space-y-6">
                 <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-400 mb-2">Overview</p>
+                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Overview</p>
                     <x-admin.nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')" label="Dashboard">
                         <x-admin.icon name="dashboard" />
                         <span x-show="!collapsed" x-cloak>Dashboard</span>
@@ -42,7 +42,7 @@
                 </div>
 
                 <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-400 mb-2">Catalog</p>
+                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Catalog</p>
                     <div class="space-y-1">
                         <x-admin.nav-link :href="route('admin.categories.index')" :active="request()->routeIs('admin.categories.*')" label="Categories">
                             <x-admin.icon name="categories" />
@@ -60,7 +60,7 @@
                 </div>
 
                 <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-400 mb-2">People</p>
+                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">People</p>
                     <div class="space-y-1">
                         <x-admin.nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')" label="Users">
                             <x-admin.icon name="users" />
@@ -74,7 +74,7 @@
                 </div>
 
                 <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-400 mb-2">Finance</p>
+                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Finance</p>
                     <div class="space-y-1">
                         <x-admin.nav-link :href="route('admin.revenue.index')" :active="request()->routeIs('admin.revenue.*')" label="Revenue">
                             <x-admin.icon name="revenue" />
@@ -84,7 +84,7 @@
                 </div>
 
                 <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-400 mb-2">System</p>
+                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">System</p>
                     <div class="space-y-1">
                         <x-admin.nav-link :href="route('admin.settings.index')" :active="request()->routeIs('admin.settings.*')" label="Settings">
                             <x-admin.icon name="settings" />
@@ -94,7 +94,7 @@
                 </div>
             </nav>
 
-            <div class="relative border-t border-white/10 p-4">
+            <div class="relative border-t border-white/15 p-4">
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit" title="Sign out"
