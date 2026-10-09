@@ -18,7 +18,7 @@
                 <div class="flex items-center gap-8">
                     {{-- Decorative cluster --}}
                     <div class="hidden lg:block relative w-20 h-20 flex-shrink-0">
-                        <div class="h-20 w-20 rounded-3xl bg-brand-700 rotate-6 shadow-xl flex items-center justify-center">
+                        <div class="h-20 w-20 rounded-3xl bg-brand-500 rotate-6 shadow-xl flex items-center justify-center">
                             <i class="fa-solid fa-graduation-cap text-3xl text-accent-400 -rotate-6"></i>
                         </div>
                         <div class="absolute -bottom-3 -left-4 h-10 w-14 rounded-xl bg-accent-500 shadow-lg flex items-center justify-center -rotate-12">
@@ -136,7 +136,7 @@
                             <tr class="hover:bg-brand-50/30 transition">
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-3">
-                                        <div class="h-11 w-11 flex-shrink-0 rounded-xl bg-gradient-to-br from-brand-700 to-brand-900 flex items-center justify-center overflow-hidden">
+                                        <div class="h-11 w-11 flex-shrink-0 rounded-xl bg-brand-500 flex items-center justify-center overflow-hidden">
                                             @if ($course->thumbnail)
                                                 <img src="{{ Storage::url($course->thumbnail) }}" class="h-full w-full object-cover">
                                             @else

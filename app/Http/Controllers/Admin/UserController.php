@@ -73,18 +73,18 @@ class UserController extends BaseAdminController
 
     public function toggleStatus(User $user): RedirectResponse
     {
-        if ($user->id === auth()->id()) {
+        if ($user->id === current_admin_user()?->id) {
             return back()->with('flash_error', 'You cannot suspend your own account.');
         }
 
         return $this->tryActionBack(function () use ($user) {
-            $user->update(['status' => $user->status === 'active' ? 'suspended' : 'active']);
-        }, fn () => "{$user->name} is now {$user->status}.");
+            $user->update(['status' => ! $user->status]);
+        }, fn () => "{$user->name} is now " . ($user->status ? 'active' : 'suspended') . '.');
     }
 
     public function destroy(User $user): RedirectResponse
     {
-        if ($user->id === auth()->id()) {
+        if ($user->id === current_admin_user()?->id) {
             return back()->with('flash_error', 'You cannot delete your own account.');
         }
 

@@ -10,30 +10,166 @@ use App\Http\Controllers\Admin\RevenueController;
 use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Auth\TempLoginController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthController;
+
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Home
 |--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
+})->name('login');
+
+
+/*
+|--------------------------------------------------------------------------
+| Guest Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('guest')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/login', [
+        AuthController::class,
+        'showLogin'
+    ])->name('login');
+
+    Route::post('/login', [
+        AuthController::class,
+        'login'
+    ])->name('login.submit');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Register
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/register', [
+        AuthController::class,
+        'showRegister'
+    ])->name('register');
+
+    Route::post('/register', [
+        AuthController::class,
+        'register'
+    ])->name('register.submit');
+
 });
 
-// TEMPORARY — remove once the real auth flow (login/register/forgot) is merged.
-Route::get('/login', [TempLoginController::class, 'create'])->name('login')->middleware('guest');
-Route::post('/login', [TempLoginController::class, 'store'])->middleware('guest');
-Route::post('/logout', [TempLoginController::class, 'destroy'])->name('logout')->middleware('auth');
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+/*
+|--------------------------------------------------------------------------
+| Forgot Password
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/forgot-password', function () {
+    return view('auth.forgot-password');
+})->name('password.request');
+
+
+/*
+|--------------------------------------------------------------------------
+| Reset Password
+|--------------------------------------------------------------------------
+|
+| Password reset email opens:
+|
+| /reset-password?token=XXXXX&email=XXXXX
+|
+*/
+Route::get('/reset-password', [
+    AuthController::class,
+    'showResetPassword'
+])->name('password.reset');
+/*
+|--------------------------------------------------------------------------
+| Device Verification
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/verify-device', [
+    AuthController::class,
+    'verifyDevice'
+])->name('verify.device');
+
+
+/*
+|--------------------------------------------------------------------------
+| Establish Web Session
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/web/session', [
+    AuthController::class,
+    'establishSession'
+])
+->middleware('device.identification')
+->name('web.session');
+
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Web Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('web.auth')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/dashboard', function () {
+        if (current_admin_user()?->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return view('dashboard.index');
+    })->name('dashboard');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current User
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/me', [
+        AuthController::class,
+        'me'
+    ])->name('me');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/logout', [
+        AuthController::class,
+        'logout'
+    ])->name('logout');
+
+});
+
+Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Categories
