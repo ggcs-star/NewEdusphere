@@ -35,21 +35,22 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">Lesson Type</label>
-                <select name="lesson_type" x-model="lessonType" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                    <option value="video">Video</option>
-                    <option value="document">Document</option>
-                    <option value="quiz">Quiz</option>
-                </select>
+                <x-admin.searchable-select
+                    name="lesson_type"
+                    :options="['video' => 'Video', 'document' => 'Document', 'quiz' => 'Quiz']"
+                    bind-to="lessonType"
+                />
             </div>
 
             {{-- Video --}}
             <div x-show="lessonType === 'video'" class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1.5">Source</label>
-                    <select name="video_type" x-model="videoType" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                        <option value="youtube">YouTube</option>
-                        <option value="upload">Upload</option>
-                    </select>
+                    <x-admin.searchable-select
+                        name="video_type"
+                        :options="['youtube' => 'YouTube', 'upload' => 'Upload']"
+                        bind-to="videoType"
+                    />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1.5">Duration</label>

@@ -44,10 +44,12 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
-                <select name="role" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                    <option value="user" @selected(old('role', $user->role ?? 'user') == 'user')>User</option>
-                    <option value="admin" @selected(old('role', $user->role ?? 'user') == 'admin')>Admin</option>
-                </select>
+                <x-admin.searchable-select
+                    name="role"
+                    :options="['user' => 'User', 'admin' => 'Admin']"
+                    :selected="old('role', $user->role ?? 'user')"
+                    required
+                />
             </div>
 
             <label class="inline-flex items-center gap-2">

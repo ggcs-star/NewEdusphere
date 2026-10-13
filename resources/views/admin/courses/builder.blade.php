@@ -193,10 +193,11 @@
                                                     </div>
                                                     <div>
                                                         <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
-                                                        <select name="type" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                                                            <option value="single_choice" @selected($question->type === 'single_choice')>Single choice</option>
-                                                            <option value="multiple_choice" @selected($question->type === 'multiple_choice')>Multiple choice</option>
-                                                        </select>
+                                                        <x-admin.searchable-select
+                                                            name="type"
+                                                            :options="['single_choice' => 'Single choice', 'multiple_choice' => 'Multiple choice']"
+                                                            :selected="$question->type"
+                                                        />
                                                     </div>
                                                     <div>
                                                         <label class="block text-xs font-medium text-slate-700 mb-1">Options <span class="text-slate-400">(check the correct answer(s))</span></label>
@@ -238,10 +239,10 @@
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
-                                                <select name="type" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                                                    <option value="single_choice">Single choice</option>
-                                                    <option value="multiple_choice">Multiple choice</option>
-                                                </select>
+                                                <x-admin.searchable-select
+                                                    name="type"
+                                                    :options="['single_choice' => 'Single choice', 'multiple_choice' => 'Multiple choice']"
+                                                />
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-slate-700 mb-1">Options <span class="text-slate-400">(check the correct answer(s))</span></label>

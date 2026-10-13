@@ -68,12 +68,15 @@
 
     <form method="GET" class="flex flex-wrap items-center gap-3 mb-6">
         <x-admin.search-input :value="$search" placeholder="Search name or email..." />
-        <select name="role" onchange="this.form.submit()" class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none">
-            <option value="all" @selected($selectedRole == 'all')>All Roles</option>
-            <option value="admin" @selected($selectedRole == 'admin')>Admin</option>
-            <option value="user" @selected($selectedRole == 'user')>User</option>
-            <option value="instructor" @selected($selectedRole == 'instructor')>Instructor</option>
-        </select>
+        <x-admin.searchable-select
+            name="role"
+            :options="['admin' => 'Admin', 'user' => 'User', 'instructor' => 'Instructor']"
+            :selected="$selectedRole"
+            all-label="All Roles"
+            pill
+            autosubmit
+            class="w-44"
+        />
         <button type="submit" class="rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-950 transition">Filter</button>
     </form>
 
@@ -119,11 +122,15 @@
                                     <form action="{{ route('admin.users.update-status', $user) }}" method="POST">
                                         @csrf
                                         @method('PATCH')
-                                        <select name="status" onchange="this.form.submit()"
-                                            class="rounded-full border-0 pl-3 pr-7 py-1.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-brand-200 cursor-pointer {{ $user->status ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
-                                            <option value="active" @selected($user->status)>Active</option>
-                                            <option value="suspended" @selected(! $user->status)>Suspended</option>
-                                        </select>
+                                        <x-admin.searchable-select
+                                            name="status"
+                                            :options="['active' => 'Active', 'suspended' => 'Suspended']"
+                                            :selected="$user->status ? 'active' : 'suspended'"
+                                            :button-class="($user->status ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700').' border-0 text-xs font-semibold'"
+                                            pill
+                                            autosubmit
+                                            class="inline-block w-32"
+                                        />
                                     </form>
                                 @endif
                             </td>

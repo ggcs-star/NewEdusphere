@@ -78,39 +78,47 @@
         <form method="GET" class="flex flex-wrap items-center gap-3 mb-6">
             <x-admin.search-input :value="$search" placeholder="Search courses..." />
 
-            <select name="category_id" onchange="this.form.submit()"
-                class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none">
-                <option value="all">All Categories</option>
-                @foreach ($categories as $cat)
-                    <option value="{{ $cat->id }}" @selected($selectedCategory == $cat->id)>{{ $cat->name }}</option>
-                @endforeach
-            </select>
+            <x-admin.searchable-select
+                name="category_id"
+                :options="$categories->pluck('name', 'id')"
+                :selected="$selectedCategory"
+                all-label="All Categories"
+                pill
+                autosubmit
+                class="w-48"
+            />
 
             @unless ($isPendingView)
-                <select name="status" onchange="this.form.submit()"
-                    class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none">
-                    <option value="all" @selected($selectedStatus == 'all')>All Status</option>
-                    <option value="draft" @selected($selectedStatus == 'draft')>Draft</option>
-                    <option value="pending" @selected($selectedStatus == 'pending')>Pending</option>
-                    <option value="active" @selected($selectedStatus == 'active')>Active</option>
-                    <option value="rejected" @selected($selectedStatus == 'rejected')>Rejected</option>
-                </select>
+                <x-admin.searchable-select
+                    name="status"
+                    :options="['draft' => 'Draft', 'pending' => 'Pending', 'active' => 'Active', 'rejected' => 'Rejected']"
+                    :selected="$selectedStatus"
+                    all-label="All Status"
+                    pill
+                    autosubmit
+                    class="w-40"
+                />
             @endunless
 
-            <select name="price" onchange="this.form.submit()"
-                class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none">
-                <option value="all" @selected($selectedPrice == 'all')>All Prices</option>
-                <option value="free" @selected($selectedPrice == 'free')>Free</option>
-                <option value="paid" @selected($selectedPrice == 'paid')>Paid</option>
-            </select>
+            <x-admin.searchable-select
+                name="price"
+                :options="['free' => 'Free', 'paid' => 'Paid']"
+                :selected="$selectedPrice"
+                all-label="All Prices"
+                pill
+                autosubmit
+                class="w-36"
+            />
 
-            <select name="instructor_id" onchange="this.form.submit()"
-                class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none max-w-[180px]">
-                <option value="all" @selected($selectedInstructor == 'all')>All Instructors</option>
-                @foreach ($instructors as $instructor)
-                    <option value="{{ $instructor->id }}" @selected($selectedInstructor == $instructor->id)>{{ $instructor->name }}</option>
-                @endforeach
-            </select>
+            <x-admin.searchable-select
+                name="instructor_id"
+                :options="$instructors->pluck('name', 'id')"
+                :selected="$selectedInstructor"
+                all-label="All Instructors"
+                pill
+                autosubmit
+                class="w-48"
+            />
 
             <button type="submit" class="rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-950 transition">Filter</button>
         </form>
@@ -176,18 +184,23 @@
                                     <form action="{{ route('admin.courses.update-status', $course) }}" method="POST">
                                         @csrf
                                         @method('PATCH')
-                                        <select name="status" onchange="this.form.submit()"
-                                            class="rounded-full border-0 pl-3 pr-7 py-1.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-brand-200 cursor-pointer
-                                            @switch($course->status)
-                                                @case('active') bg-emerald-50 text-emerald-700 @break
-                                                @case('pending') bg-amber-50 text-amber-700 @break
-                                                @case('rejected') bg-rose-50 text-rose-700 @break
-                                                @default bg-slate-100 text-slate-600
-                                            @endswitch">
-                                            @foreach (['draft' => 'Draft', 'pending' => 'Pending', 'active' => 'Active', 'rejected' => 'Rejected'] as $value => $label)
-                                                <option value="{{ $value }}" @selected($course->status === $value)>{{ $label }}</option>
-                                            @endforeach
-                                        </select>
+                                        @php
+                                            $courseStatusColor = match ($course->status) {
+                                                'active' => 'bg-emerald-50 text-emerald-700',
+                                                'pending' => 'bg-amber-50 text-amber-700',
+                                                'rejected' => 'bg-rose-50 text-rose-700',
+                                                default => 'bg-slate-100 text-slate-600',
+                                            };
+                                        @endphp
+                                        <x-admin.searchable-select
+                                            name="status"
+                                            :options="['draft' => 'Draft', 'pending' => 'Pending', 'active' => 'Active', 'rejected' => 'Rejected']"
+                                            :selected="$course->status"
+                                            :button-class="$courseStatusColor.' border-0 text-xs font-semibold'"
+                                            pill
+                                            autosubmit
+                                            class="inline-block w-32"
+                                        />
                                     </form>
                                 </td>
                                 <td class="px-5 py-3.5">

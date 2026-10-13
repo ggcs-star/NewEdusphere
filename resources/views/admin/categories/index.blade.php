@@ -36,12 +36,15 @@
         <form method="GET" class="flex flex-wrap items-center gap-3 mb-6">
             <x-admin.search-input :value="$search" placeholder="Search categories..." />
 
-            <select name="status" onchange="this.form.submit()"
-                class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none">
-                <option value="all" @selected($selectedStatus == 'all')>All Status</option>
-                <option value="active" @selected($selectedStatus == 'active')>Active</option>
-                <option value="inactive" @selected($selectedStatus == 'inactive')>Inactive</option>
-            </select>
+            <x-admin.searchable-select
+                name="status"
+                :options="['active' => 'Active', 'inactive' => 'Inactive']"
+                :selected="$selectedStatus"
+                all-label="All Status"
+                pill
+                autosubmit
+                class="w-40"
+            />
 
             <button type="submit" class="rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-950 transition">Filter</button>
         </form>

@@ -18,6 +18,6 @@ $p = $palette[$color] ?? $palette['violet'];
         <i class="fa-solid {{ $icon }}"></i>
     </div>
 
-    <div class="relative mt-4 text-2xl font-extrabold text-brand-950 leading-tight">{{ $slot }}</div>
+    <div class="relative mt-4 text-2xl font-extrabold text-brand-950 leading-tight truncate">{{ $slot }}</div>
     <p class="relative text-sm text-slate-500 mt-0.5">{{ $label }}</p>
 </div>

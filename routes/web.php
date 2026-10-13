@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EnrollmentController;
+use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\LessonController;
 use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\RevenueController;
@@ -220,11 +221,23 @@ Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group
 
     // Enrollment history
     Route::get('/enrollments', [EnrollmentController::class, 'index'])->name('enrollments.index');
+    Route::get('/enrollments/create', [EnrollmentController::class, 'create'])->name('enrollments.create');
+    Route::post('/enrollments', [EnrollmentController::class, 'store'])->name('enrollments.store');
+    Route::get('/enrollments/{enrollment}', [EnrollmentController::class, 'show'])->name('enrollments.show');
+    Route::get('/enrollments/{enrollment}/edit', [EnrollmentController::class, 'edit'])->name('enrollments.edit');
+    Route::put('/enrollments/{enrollment}', [EnrollmentController::class, 'update'])->name('enrollments.update');
+    Route::delete('/enrollments/{enrollment}', [EnrollmentController::class, 'destroy'])->name('enrollments.destroy');
 
     // Revenue
-    Route::get('/revenue', [RevenueController::class, 'index'])->name('revenue.index');
+    Route::get('/revenue/{tab?}', [RevenueController::class, 'index'])->name('revenue.index');
+    Route::delete('/revenue/{payment}', [RevenueController::class, 'destroy'])->name('revenue.destroy');
+    Route::patch('/revenue/{payment}/mark-paid', [RevenueController::class, 'markPaid'])->name('revenue.mark-paid');
 
     // Settings
     Route::get('/settings/{tab?}', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings/{tab}', [SettingController::class, 'update'])->name('settings.update');
+
+    // Languages (settings sub-feature)
+    Route::post('/languages', [LanguageController::class, 'store'])->name('languages.store');
+    Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
 });

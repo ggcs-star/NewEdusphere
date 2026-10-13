@@ -50,13 +50,11 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">Parent Category</label>
-                <select name="parent_id" x-model="parentId"
-                    class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                    <option value="0">None (top-level category)</option>
-                    @foreach ($parentOptions as $option)
-                        <option value="{{ $option->id }}" @selected(($category->parent_id ?? null) == $option->id)>{{ $option->name }}</option>
-                    @endforeach
-                </select>
+                <x-admin.searchable-select
+                    name="parent_id"
+                    :options="collect(['0' => 'None (top-level category)'])->merge($parentOptions->pluck('name', 'id'))"
+                    bind-to="parentId"
+                />
             </div>
 
             <div x-show="parentId == 0 || parentId === ''">

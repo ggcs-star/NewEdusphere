@@ -66,9 +66,13 @@
                             <x-admin.icon name="users" />
                             <span x-show="!collapsed" x-cloak>Users</span>
                         </x-admin.nav-link>
-                        <x-admin.nav-link :href="route('admin.enrollments.index')" :active="request()->routeIs('admin.enrollments.*')" label="Enrollment History">
+                        <x-admin.nav-link :href="route('admin.enrollments.index')" :active="request()->routeIs('admin.enrollments.index')" label="Enrollment History">
                             <x-admin.icon name="enrollment" />
                             <span x-show="!collapsed" x-cloak>Enrollment History</span>
+                        </x-admin.nav-link>
+                        <x-admin.nav-link :href="route('admin.enrollments.create')" :active="request()->routeIs('admin.enrollments.create')" label="Enroll Student">
+                            <x-admin.icon name="enrollment" />
+                            <span x-show="!collapsed" x-cloak>Enroll Student</span>
                         </x-admin.nav-link>
                     </div>
                 </div>
