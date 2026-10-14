@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
@@ -10,69 +11,149 @@ use App\Http\Controllers\Admin\RevenueController;
 use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
-
+use App\Http\Controllers\Frontend\CartController;
+use App\Http\Controllers\Frontend\CheckoutController;
+use App\Http\Controllers\Frontend\MyCoursesController;
+use App\Models\Category;
+use App\Models\Course;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Home
+| Public Homepage
 |--------------------------------------------------------------------------
 */
 
 Route::get('/', function () {
-    return redirect()->route('login');
-})->name('login');
+    $categories = Category::query()
+        ->topLevel()
+        ->withCount('children')
+        ->orderBy('name')
+        ->take(8)
+        ->get();
 
+    $featuredCourses = Course::query()
+        ->with(['instructor', 'category'])
+        ->latest()
+        ->take(8)
+        ->get();
+
+    return view('welcome', compact('categories', 'featuredCourses'));
+})->name('home');
 
 /*
 |--------------------------------------------------------------------------
-| Guest Routes
+| Public Frontend Pages
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/courses', function (Request $request) {
+    $query = Course::query()
+        ->with(['instructor', 'category']);
+
+    // Search by course title or short description.
+    if ($request->filled('q')) {
+        $search = trim((string) $request->query('q'));
+
+        $query->where(function ($builder) use ($search) {
+            $builder->where('title', 'like', '%' . $search . '%')
+                ->orWhere(
+                    'short_description',
+                    'like',
+                    '%' . $search . '%'
+                );
+        });
+    }
+
+    // Filter by category.
+    if ($request->filled('category')) {
+        $query->where('category_id', $request->query('category'));
+    }
+
+    $courses = $query
+        ->latest()
+        ->paginate(12)
+        ->withQueryString();
+
+    $categories = Category::query()
+        ->orderBy('name')
+        ->get();
+
+    return view(
+        'frontend.courses.index',
+        compact('courses', 'categories')
+    );
+})->name('courses.index');
+
+Route::get('/courses/{course}', function (Course $course) {
+    $course->load(['instructor', 'category']);
+
+    return view('frontend.courses.show', compact('course'));
+})->whereNumber('course')->name('courses.show');
+
+Route::get('/categories', function () {
+    $categories = Category::query()
+        ->withCount('children')
+        ->orderBy('name')
+        ->get();
+
+    return view('frontend.categories.index', compact('categories'));
+})->name('categories.index');
+
+Route::view('/about', 'frontend.about')->name('about');
+
+Route::get('/contact', function () {
+    return view('frontend.contact');
+})->name('contact');
+
+Route::post('/contact', function (Request $request) {
+    $request->validate([
+        'name' => ['required', 'string', 'max:120'],
+        'email' => ['required', 'email', 'max:190'],
+        'subject' => ['nullable', 'string', 'max:190'],
+        'message' => ['required', 'string', 'max:5000'],
+    ]);
+
+    return back()->with(
+        'success',
+        'Your message form was submitted. Connect email or database storage before launch to retain the message.'
+    );
+})->name('contact.submit');
+
+/*
+|--------------------------------------------------------------------------
+| Guest Authentication Routes
 |--------------------------------------------------------------------------
 */
 
 Route::middleware('guest')->group(function () {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Login
-    |--------------------------------------------------------------------------
-    */
-
     Route::get('/login', [
         AuthController::class,
-        'showLogin'
+        'showLogin',
     ])->name('login');
 
     Route::post('/login', [
         AuthController::class,
-        'login'
+        'login',
     ])->name('login.submit');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Register
-    |--------------------------------------------------------------------------
-    */
 
     Route::get('/register', [
         AuthController::class,
-        'showRegister'
+        'showRegister',
     ])->name('register');
 
     Route::post('/register', [
         AuthController::class,
-        'register'
+        'register',
     ])->name('register.submit');
-
 });
-
 
 /*
 |--------------------------------------------------------------------------
-| Forgot Password
+| Password Recovery
 |--------------------------------------------------------------------------
 */
 
@@ -80,21 +161,11 @@ Route::get('/forgot-password', function () {
     return view('auth.forgot-password');
 })->name('password.request');
 
-
-/*
-|--------------------------------------------------------------------------
-| Reset Password
-|--------------------------------------------------------------------------
-|
-| Password reset email opens:
-|
-| /reset-password?token=XXXXX&email=XXXXX
-|
-*/
 Route::get('/reset-password', [
     AuthController::class,
-    'showResetPassword'
+    'showResetPassword',
 ])->name('password.reset');
+
 /*
 |--------------------------------------------------------------------------
 | Device Verification
@@ -103,9 +174,8 @@ Route::get('/reset-password', [
 
 Route::get('/verify-device', [
     AuthController::class,
-    'verifyDevice'
+    'verifyDevice',
 ])->name('verify.device');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -115,11 +185,9 @@ Route::get('/verify-device', [
 
 Route::post('/web/session', [
     AuthController::class,
-    'establishSession'
-])
-->middleware('device.identification')
-->name('web.session');
-
+    'establishSession',
+])->middleware('device.identification')
+    ->name('web.session');
 
 /*
 |--------------------------------------------------------------------------
@@ -129,99 +197,441 @@ Route::post('/web/session', [
 
 Route::middleware('web.auth')->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard
-    |--------------------------------------------------------------------------
-    */
-
+    // User dashboard.
     Route::get('/dashboard', function () {
-        if (current_admin_user()?->role === 'admin') {
+        $user = current_admin_user();
+
+        if ($user?->role === 'admin') {
             return redirect()->route('admin.dashboard');
         }
 
-        return view('dashboard.index');
+        $userId = $user?->id;
+
+        $enrolledIds = $userId
+            ? DB::table('enrol')
+                ->where('user_id', $userId)
+                ->pluck('course_id')
+            : collect();
+
+        $courses = $enrolledIds->isNotEmpty()
+            ? Course::with(['instructor', 'category'])
+                ->whereIn('id', $enrolledIds)
+                ->latest()
+                ->take(6)
+                ->get()
+            : collect();
+
+        $enrolledCount = $enrolledIds->count();
+
+        return view(
+            'frontend.dashboard.index',
+            compact('user', 'courses', 'enrolledCount')
+        );
     })->name('dashboard');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Current User
-    |--------------------------------------------------------------------------
-    */
 
     Route::get('/me', [
         AuthController::class,
-        'me'
+        'me',
     ])->name('me');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Logout
-    |--------------------------------------------------------------------------
-    */
 
     Route::post('/logout', [
         AuthController::class,
-        'logout'
+        'logout',
     ])->name('logout');
 
+    /*
+    |--------------------------------------------------------------------------
+    | Checkout Payment Actions
+    |--------------------------------------------------------------------------
+    | The checkout page can be viewed by guests.
+    | Actual payment actions require an authenticated user.
+    | Controllers must still validate ownership and payment signatures.
+    */
+
+    Route::post('/checkout/pay', [
+        CheckoutController::class,
+        'pay',
+    ])->name('checkout.pay');
+
+    Route::post('/checkout/verify', [
+        CheckoutController::class,
+        'verify',
+    ])->name('checkout.verify');
+
+    /*
+    |--------------------------------------------------------------------------
+    | My Courses
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/my-courses', [
+        MyCoursesController::class,
+        'index',
+    ])->name('my-courses.index');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase History
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/purchase-history', function () {
+        $user = current_admin_user();
+
+        abort_unless($user, 403);
+
+        $payments = DB::table('payment')
+            ->where('user_id', $user->id)
+            ->orderByDesc('date_added')
+            ->get();
+
+        return view(
+            'frontend.purchase-history.index',
+            compact('payments', 'user')
+        );
+    })->name('purchase-history.index');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Profile
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/profile', function () {
+        $user = current_admin_user();
+
+        abort_unless($user, 403);
+
+        return view('frontend.profile.index', compact('user'));
+    })->name('profile.edit');
+
+    Route::put('/profile', function (Request $request) {
+        $user = current_admin_user();
+
+        abort_unless($user, 403);
+
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['nullable', 'string', 'max:100'],
+            'biography' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $user->first_name = $validated['first_name'];
+        $user->last_name = $validated['last_name'] ?? '';
+        $user->biography = $validated['biography'] ?? '';
+        $user->save();
+
+        return back()->with(
+            'success',
+            'Profile updated successfully.'
+        );
+    })->name('profile.update');
 });
 
-Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+/*
+|--------------------------------------------------------------------------
+| Learner Cart
+|--------------------------------------------------------------------------
+| Cart operations are available to guests.
+| CartController should store guest cart items in the session.
+|--------------------------------------------------------------------------
+*/
 
-    // Categories
-    Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
-    Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
-    Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
-    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+Route::prefix('cart')->name('cart.')->group(function () {
 
-    // Courses
-    Route::get('/courses', [CourseController::class, 'index'])->name('courses.index');
-    Route::get('/courses/pending', [CourseController::class, 'pending'])->name('courses.pending');
-    Route::get('/courses/create', [CourseController::class, 'create'])->name('courses.create');
-    Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
-    Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])->name('courses.edit');
-    Route::put('/courses/{course}', [CourseController::class, 'update'])->name('courses.update');
-    Route::delete('/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
-    Route::post('/courses/{course}/approve', [CourseController::class, 'approve'])->name('courses.approve');
-    Route::post('/courses/{course}/reject', [CourseController::class, 'reject'])->name('courses.reject');
-    Route::patch('/courses/{course}/status', [CourseController::class, 'updateStatus'])->name('courses.update-status');
-    Route::get('/courses/{course}/builder', [CourseController::class, 'builder'])->name('courses.builder');
+    Route::get('/', [
+        CartController::class,
+        'index',
+    ])->name('index');
 
-    // Course content builder
-    Route::post('/courses/{course}/sections', [SectionController::class, 'store'])->name('sections.store');
-    Route::post('/courses/{course}/sections/reorder', [SectionController::class, 'reorder'])->name('sections.reorder');
-    Route::put('/sections/{section}', [SectionController::class, 'update'])->name('sections.update');
-    Route::delete('/sections/{section}', [SectionController::class, 'destroy'])->name('sections.destroy');
+    Route::post('/add/{courseId}', [
+        CartController::class,
+        'add',
+    ])->whereNumber('courseId')->name('add');
 
-    Route::post('/sections/{section}/lessons', [LessonController::class, 'store'])->name('lessons.store');
-    Route::post('/sections/{section}/lessons/reorder', [LessonController::class, 'reorder'])->name('lessons.reorder');
-    Route::put('/lessons/{lesson}', [LessonController::class, 'update'])->name('lessons.update');
-    Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
+    Route::post('/buy-now/{courseId}', [
+        CartController::class,
+        'buyNow',
+    ])->whereNumber('courseId')->name('buy-now');
 
-    Route::post('/lessons/{lesson}/questions', [QuestionController::class, 'store'])->name('questions.store');
-    Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
-    Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
+    Route::delete('/remove/{courseId}', [
+        CartController::class,
+        'remove',
+    ])->whereNumber('courseId')->name('remove');
 
-    // Users
-    Route::get('/users', [UserController::class, 'index'])->name('users.index');
-    Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
-    Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
-    Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-    Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
-
-    // Enrollment history
-    Route::get('/enrollments', [EnrollmentController::class, 'index'])->name('enrollments.index');
-
-    // Revenue
-    Route::get('/revenue', [RevenueController::class, 'index'])->name('revenue.index');
-
-    // Settings
-    Route::get('/settings/{tab?}', [SettingController::class, 'index'])->name('settings.index');
-    Route::post('/settings/{tab}', [SettingController::class, 'update'])->name('settings.update');
+    Route::delete('/clear', [
+        CartController::class,
+        'clear',
+    ])->name('clear');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Checkout Page
+|--------------------------------------------------------------------------
+| Guest can view checkout.
+| Payment POST routes are defined inside web.auth above.
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/checkout', [
+    CheckoutController::class,
+    'index',
+])->name('checkout.index');
+
+/*
+|--------------------------------------------------------------------------
+| Admin Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['web.auth', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+
+        // Dashboard.
+        Route::get('/dashboard', [
+            DashboardController::class,
+            'index',
+        ])->name('dashboard');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Categories
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/categories', [
+            CategoryController::class,
+            'index',
+        ])->name('categories.index');
+
+        Route::post('/categories', [
+            CategoryController::class,
+            'store',
+        ])->name('categories.store');
+
+        Route::put('/categories/{category}', [
+            CategoryController::class,
+            'update',
+        ])->name('categories.update');
+
+        Route::delete('/categories/{category}', [
+            CategoryController::class,
+            'destroy',
+        ])->name('categories.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Courses
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/courses', [
+            CourseController::class,
+            'index',
+        ])->name('courses.index');
+
+        Route::get('/courses/pending', [
+            CourseController::class,
+            'pending',
+        ])->name('courses.pending');
+
+        Route::get('/courses/create', [
+            CourseController::class,
+            'create',
+        ])->name('courses.create');
+
+        Route::post('/courses', [
+            CourseController::class,
+            'store',
+        ])->name('courses.store');
+
+        Route::get('/courses/{course}/edit', [
+            CourseController::class,
+            'edit',
+        ])->name('courses.edit');
+
+        Route::put('/courses/{course}', [
+            CourseController::class,
+            'update',
+        ])->name('courses.update');
+
+        Route::delete('/courses/{course}', [
+            CourseController::class,
+            'destroy',
+        ])->name('courses.destroy');
+
+        Route::post('/courses/{course}/approve', [
+            CourseController::class,
+            'approve',
+        ])->name('courses.approve');
+
+        Route::post('/courses/{course}/reject', [
+            CourseController::class,
+            'reject',
+        ])->name('courses.reject');
+
+        Route::patch('/courses/{course}/status', [
+            CourseController::class,
+            'updateStatus',
+        ])->name('courses.update-status');
+
+        Route::get('/courses/{course}/builder', [
+            CourseController::class,
+            'builder',
+        ])->name('courses.builder');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Course Sections
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/courses/{course}/sections', [
+            SectionController::class,
+            'store',
+        ])->name('sections.store');
+
+        Route::post('/courses/{course}/sections/reorder', [
+            SectionController::class,
+            'reorder',
+        ])->name('sections.reorder');
+
+        Route::put('/sections/{section}', [
+            SectionController::class,
+            'update',
+        ])->name('sections.update');
+
+        Route::delete('/sections/{section}', [
+            SectionController::class,
+            'destroy',
+        ])->name('sections.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lessons
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/sections/{section}/lessons', [
+            LessonController::class,
+            'store',
+        ])->name('lessons.store');
+
+        Route::post('/sections/{section}/lessons/reorder', [
+            LessonController::class,
+            'reorder',
+        ])->name('lessons.reorder');
+
+        Route::put('/lessons/{lesson}', [
+            LessonController::class,
+            'update',
+        ])->name('lessons.update');
+
+        Route::delete('/lessons/{lesson}', [
+            LessonController::class,
+            'destroy',
+        ])->name('lessons.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lesson Questions
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/lessons/{lesson}/questions', [
+            QuestionController::class,
+            'store',
+        ])->name('questions.store');
+
+        Route::put('/questions/{question}', [
+            QuestionController::class,
+            'update',
+        ])->name('questions.update');
+
+        Route::delete('/questions/{question}', [
+            QuestionController::class,
+            'destroy',
+        ])->name('questions.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/users', [
+            UserController::class,
+            'index',
+        ])->name('users.index');
+
+        Route::get('/users/create', [
+            UserController::class,
+            'create',
+        ])->name('users.create');
+
+        Route::post('/users', [
+            UserController::class,
+            'store',
+        ])->name('users.store');
+
+        Route::get('/users/{user}/edit', [
+            UserController::class,
+            'edit',
+        ])->name('users.edit');
+
+        Route::put('/users/{user}', [
+            UserController::class,
+            'update',
+        ])->name('users.update');
+
+        Route::post('/users/{user}/toggle-status', [
+            UserController::class,
+            'toggleStatus',
+        ])->name('users.toggle-status');
+
+        Route::delete('/users/{user}', [
+            UserController::class,
+            'destroy',
+        ])->name('users.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Enrollments
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/enrollments', [
+            EnrollmentController::class,
+            'index',
+        ])->name('enrollments.index');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Revenue
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/revenue', [
+            RevenueController::class,
+            'index',
+        ])->name('revenue.index');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Settings
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/settings/{tab?}', [
+            SettingController::class,
+            'index',
+        ])->name('settings.index');
+
+        Route::post('/settings/{tab}', [
+            SettingController::class,
+            'update',
+        ])->name('settings.update');
+    });

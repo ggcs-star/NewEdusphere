@@ -24,6 +24,14 @@ return [
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],
+    'google' => [
+    'client_id' => env('GOOGLE_CLIENT_ID', ''),
+    'client_secret' => env('GOOGLE_CLIENT_SECRET', ''),
+    'redirect' => env(
+        'GOOGLE_REDIRECT_URI',
+        'http://127.0.0.1:8000/api/v1/auth/social/google/callback'
+    ),
+],
 
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
