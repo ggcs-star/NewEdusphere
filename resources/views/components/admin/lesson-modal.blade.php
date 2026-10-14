@@ -1,10 +1,10 @@
-@props(['section' => null, 'lesson' => null, 'mode'])
+@props(['section' => null, 'lesson' => null, 'mode', 'routePrefix' => 'admin'])
 
 @php
     $isEdit = $mode === 'edit';
     $showExpr = $isEdit ? "editLessonOpen === {$lesson->id}" : "addLessonOpen === {$section->id}";
     $closeExpr = $isEdit ? 'editLessonOpen = null' : 'addLessonOpen = null';
-    $action = $isEdit ? route('admin.lessons.update', $lesson) : route('admin.lessons.store', $section);
+    $action = $isEdit ? route("{$routePrefix}.lessons.update", $lesson) : route("{$routePrefix}.lessons.store", $section);
     $model = $lesson; // may be null in add mode
 @endphp
 

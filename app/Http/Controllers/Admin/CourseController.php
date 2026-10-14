@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\AuthorizesCourseOwnership;
 use App\Concerns\GeneratesUniqueSlugs;
 use App\Models\Category;
 use App\Models\Course;
@@ -14,6 +15,7 @@ use Illuminate\View\View;
 
 class CourseController extends BaseAdminController
 {
+    use AuthorizesCourseOwnership;
     use GeneratesUniqueSlugs;
 
     public function __construct(
@@ -129,9 +131,13 @@ class CourseController extends BaseAdminController
 
     public function destroy(Course $course): RedirectResponse
     {
+        $this->authorizeCourseAccess($course);
+
+        $routePrefix = request()->routeIs('instructor.*') ? 'instructor' : 'admin';
+
         return $this->tryAction(function () use ($course) {
             $course->delete();
-        }, 'Course deleted.', 'admin.courses.index');
+        }, 'Course deleted.', "{$routePrefix}.courses.index");
     }
 
     public function approve(Course $course): RedirectResponse
@@ -166,10 +172,13 @@ class CourseController extends BaseAdminController
 
     public function builder(Course $course): View
     {
+        $this->authorizeCourseAccess($course);
+
         $course->load(['sections.lessons.questions']);
 
         return view('admin.courses.builder', [
             'course' => $course,
+            'routePrefix' => request()->routeIs('instructor.*') ? 'instructor' : 'admin',
         ]);
     }
 
