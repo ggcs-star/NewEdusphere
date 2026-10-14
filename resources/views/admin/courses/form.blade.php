@@ -50,11 +50,12 @@
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Instructor <span class="text-rose-500">*</span></label>
-                        <select name="user_id" required class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                            @foreach ($instructors as $instructor)
-                                <option value="{{ $instructor->id }}" @selected(old('user_id', $course->user_id) == $instructor->id)>{{ $instructor->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-admin.searchable-select
+                            name="user_id"
+                            :options="$instructors->pluck('name', 'id')"
+                            :selected="old('user_id', $course->user_id)"
+                            required
+                        />
                     </div>
 
                     <div>
@@ -63,35 +64,48 @@
                             class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
                     </div>
 
+                    @php
+                        $subCategoryOptions = [];
+                        $subCategoryGroups = [];
+                        foreach ($categories as $cat) {
+                            foreach ($cat->children as $child) {
+                                $subCategoryOptions[$child->id] = $child->name;
+                                $subCategoryGroups[$child->id] = $cat->id;
+                            }
+                        }
+                    @endphp
+
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Category <span class="text-rose-500">*</span></label>
-                        <select name="category_id" x-model="categoryId" required class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                            <option value="">Select category</option>
-                            @foreach ($categories as $cat)
-                                <option value="{{ $cat->id }}" @selected(old('category_id', $course->category_id) == $cat->id)>{{ $cat->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-admin.searchable-select
+                            name="category_id"
+                            :options="$categories->pluck('name', 'id')"
+                            :selected="old('category_id', $course->category_id)"
+                            placeholder="Select category"
+                            bind-to="categoryId"
+                            required
+                        />
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Sub-category</label>
-                        <select name="sub_category_id" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                            <option value="">None</option>
-                            @foreach ($categories as $cat)
-                                @foreach ($cat->children as $child)
-                                    <option value="{{ $child->id }}" x-show="categoryId == {{ $cat->id }}" @selected(old('sub_category_id', $course->sub_category_id) == $child->id)>{{ $child->name }}</option>
-                                @endforeach
-                            @endforeach
-                        </select>
+                        <x-admin.searchable-select
+                            name="sub_category_id"
+                            :options="$subCategoryOptions"
+                            :option-groups="$subCategoryGroups"
+                            group-by="categoryId"
+                            :selected="old('sub_category_id', $course->sub_category_id)"
+                            placeholder="None"
+                        />
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Level</label>
-                        <select name="level" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                            @foreach (['beginner' => 'Beginner', 'intermediate' => 'Intermediate', 'advanced' => 'Advanced', 'all_levels' => 'All Levels'] as $value => $label)
-                                <option value="{{ $value }}" @selected(old('level', $course->level) == $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
+                        <x-admin.searchable-select
+                            name="level"
+                            :options="['beginner' => 'Beginner', 'intermediate' => 'Intermediate', 'advanced' => 'Advanced', 'all_levels' => 'All Levels']"
+                            :selected="old('level', $course->level)"
+                        />
                     </div>
 
                     <div class="sm:col-span-2">
@@ -152,11 +166,11 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Course Overview Provider</label>
-                        <select name="preview_video_type" x-model="videoType" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
-                            <option value="youtube">YouTube</option>
-                            <option value="vimeo">Vimeo</option>
-                            <option value="upload">Upload Video</option>
-                        </select>
+                        <x-admin.searchable-select
+                            name="preview_video_type"
+                            :options="['youtube' => 'YouTube', 'vimeo' => 'Vimeo', 'upload' => 'Upload Video']"
+                            bind-to="videoType"
+                        />
                     </div>
                 </div>
 

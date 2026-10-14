@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\User;
+use App\Services\TrendStatsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -10,12 +11,19 @@ use Illuminate\View\View;
 
 class UserController extends BaseAdminController
 {
+    public function __construct(
+        private readonly TrendStatsService $trends,
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $query = User::withCount(['courses', 'enrollments'])->latest();
 
         if ($role = $request->get('role')) {
-            if ($role !== 'all') {
+            if ($role === 'instructor') {
+                $query->where('is_instructor', true);
+            } elseif ($role !== 'all') {
                 $query->where('role', $role);
             }
         }
@@ -29,6 +37,30 @@ class UserController extends BaseAdminController
             'users' => $query->paginate(10)->withQueryString(),
             'selectedRole' => $request->get('role', 'all'),
             'search' => $request->get('search', ''),
+            'stats' => [
+                'total' => $this->trends->forModel(User::class, fn ($q) => $q),
+                'active' => $this->trends->forModel(User::class, fn ($q) => $q->where('status', true)),
+                'instructors' => $this->trends->forModel(User::class, fn ($q) => $q->where('is_instructor', true)),
+                'admins' => $this->trends->forModel(User::class, fn ($q) => $q->where('role', 'admin')),
+            ],
+        ]);
+    }
+
+    public function show(User $user): View
+    {
+        $user->loadCount(['courses', 'enrollments']);
+
+        return view('admin.users.show', [
+            'user' => $user,
+            'enrolledCourses' => $user->enrollments()
+                ->with(['course.category', 'course.subCategory', 'course.instructor'])
+                ->latest()
+                ->get()
+                ->pluck('course')
+                ->filter(),
+            'taughtCourses' => $user->is_instructor
+                ? $user->courses()->withCount('enrollments')->with(['category', 'subCategory'])->latest()->get()
+                : collect(),
         ]);
     }
 
@@ -71,15 +103,19 @@ class UserController extends BaseAdminController
         }, 'User updated successfully.', 'admin.users.index');
     }
 
-    public function toggleStatus(User $user): RedirectResponse
+    public function updateStatus(Request $request, User $user): RedirectResponse
     {
         if ($user->id === current_admin_user()?->id) {
             return back()->with('flash_error', 'You cannot suspend your own account.');
         }
 
-        return $this->tryActionBack(function () use ($user) {
-            $user->update(['status' => ! $user->status]);
-        }, fn () => "{$user->name} is now " . ($user->status ? 'active' : 'suspended') . '.');
+        $validated = $request->validate([
+            'status' => ['required', 'in:active,suspended'],
+        ]);
+
+        return $this->tryActionBack(function () use ($validated, $user) {
+            $user->update(['status' => $validated['status'] === 'active']);
+        }, "{$user->name} is now {$validated['status']}.");
     }
 
     public function destroy(User $user): RedirectResponse
