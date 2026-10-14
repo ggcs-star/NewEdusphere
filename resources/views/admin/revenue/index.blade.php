@@ -5,7 +5,13 @@
             <div class="max-w-lg">
                 <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-950 tracking-tight">Revenue</h2>
                 <p class="mt-1 text-sm font-semibold text-accent-600">
-                    {{ $tab === 'admin' ? 'Platform earnings from every course sale.' : 'Instructor payouts and their payment status.' }}
+                    @if (! $isAdmin)
+                        Your earnings from every course sale.
+                    @elseif ($tab === 'admin')
+                        Platform earnings from every course sale.
+                    @else
+                        Instructor payouts and their payment status.
+                    @endif
                 </p>
             </div>
 
@@ -24,21 +30,23 @@
     </div>
 
     {{-- Tab nav --}}
-    <div class="inline-flex rounded-full bg-white border border-slate-200 shadow-sm p-1 mb-6">
-        <a href="{{ route('admin.revenue.index', ['tab' => 'admin', 'from' => $from, 'to' => $to]) }}"
-            class="rounded-full px-5 py-2 text-sm font-semibold transition {{ $tab === 'admin' ? 'bg-brand-900 text-white' : 'text-slate-600 hover:bg-brand-50' }}">
-            <i class="fa-solid fa-building-columns text-xs mr-1.5"></i> Admin Revenue
-        </a>
-        <a href="{{ route('admin.revenue.index', ['tab' => 'instructor', 'from' => $from, 'to' => $to]) }}"
-            class="rounded-full px-5 py-2 text-sm font-semibold transition {{ $tab === 'instructor' ? 'bg-brand-900 text-white' : 'text-slate-600 hover:bg-brand-50' }}">
-            <i class="fa-solid fa-chalkboard-user text-xs mr-1.5"></i> Instructor Revenue
-        </a>
-    </div>
+    @if ($isAdmin)
+        <div class="inline-flex rounded-full bg-white border border-slate-200 shadow-sm p-1 mb-6">
+            <a href="{{ route('admin.revenue.index', ['tab' => 'admin', 'from' => $from, 'to' => $to]) }}"
+                class="rounded-full px-5 py-2 text-sm font-semibold transition {{ $tab === 'admin' ? 'bg-brand-900 text-white' : 'text-slate-600 hover:bg-brand-50' }}">
+                <i class="fa-solid fa-building-columns text-xs mr-1.5"></i> Admin Revenue
+            </a>
+            <a href="{{ route('admin.revenue.index', ['tab' => 'instructor', 'from' => $from, 'to' => $to]) }}"
+                class="rounded-full px-5 py-2 text-sm font-semibold transition {{ $tab === 'instructor' ? 'bg-brand-900 text-white' : 'text-slate-600 hover:bg-brand-50' }}">
+                <i class="fa-solid fa-chalkboard-user text-xs mr-1.5"></i> Instructor Revenue
+            </a>
+        </div>
+    @endif
 
-    <form method="GET" action="{{ route('admin.revenue.index', $tab) }}" class="grid grid-flow-col auto-cols-max items-end gap-3 mb-6">
+    <form method="GET" action="{{ $indexUrl }}" class="grid grid-flow-col auto-cols-max items-end gap-3 mb-6">
         <div class="min-w-56">
-            <label class="block text-xs font-medium text-slate-500 mb-1">{{ $tab === 'admin' ? 'Student' : 'Instructor' }}</label>
-            <x-admin.search-input :value="$search" :placeholder="$tab === 'admin' ? 'Search student...' : 'Search instructor...'" class="!w-full !max-w-none" />
+            <label class="block text-xs font-medium text-slate-500 mb-1">{{ $isAdmin && $tab === 'instructor' ? 'Instructor' : 'Student' }}</label>
+            <x-admin.search-input :value="$search" :placeholder="$isAdmin && $tab === 'instructor' ? 'Search instructor...' : 'Search student...'" class="!w-full !max-w-none" />
         </div>
 
         <div class="min-w-44">
@@ -90,7 +98,7 @@
 
         <button type="submit" class="rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-950 transition">Apply</button>
         @if ($search || $selectedCourse !== 'all' || $selectedMethod !== 'all' || $selectedStatus !== 'all')
-            <a href="{{ route('admin.revenue.index', $tab) }}" class="text-sm font-semibold text-slate-500 hover:text-slate-700 pb-2.5">Clear</a>
+            <a href="{{ $indexUrl }}" class="text-sm font-semibold text-slate-500 hover:text-slate-700 pb-2.5">Clear</a>
         @endif
     </form>
 
@@ -190,10 +198,14 @@
                     <thead>
                         <tr class="bg-brand-50/60 text-left text-sm font-semibold uppercase tracking-wide text-brand-700">
                             <th class="px-5 py-3">Enrolled Course</th>
-                            <th class="px-5 py-3">Instructor</th>
+                            @if ($isAdmin)
+                                <th class="px-5 py-3">Instructor</th>
+                            @endif
                             <th class="px-5 py-3">Instructor Revenue</th>
                             <th class="px-5 py-3">Status</th>
-                            <th class="px-5 py-3 text-right">Actions</th>
+                            @if ($isAdmin)
+                                <th class="px-5 py-3 text-right">Actions</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -203,7 +215,9 @@
                                     <p class="text-sm font-semibold text-brand-950 truncate max-w-xs" title="{{ $payment->course->title ?? '' }}">{{ $payment->course->title ?? '—' }}</p>
                                     <p class="text-xs text-slate-400">Enrolled {{ $payment->created_at->format('D, d M Y') }}</p>
                                 </td>
-                                <td class="px-5 py-3.5 text-slate-600">{{ $payment->course->instructor->name ?? '—' }}</td>
+                                @if ($isAdmin)
+                                    <td class="px-5 py-3.5 text-slate-600">{{ $payment->course->instructor->name ?? '—' }}</td>
+                                @endif
                                 <td class="px-5 py-3.5">
                                     <p class="font-semibold text-accent-600">${{ number_format($payment->instructor_revenue, 2) }}</p>
                                     <p class="text-xs text-slate-400">Total: ${{ number_format($payment->amount, 2) }}</p>
@@ -211,24 +225,26 @@
                                 <td class="px-5 py-3.5">
                                     <x-admin.badge :color="$payment->instructor_paid_out ? 'emerald' : 'slate'">{{ $payment->instructor_paid_out ? 'Paid' : 'Pending' }}</x-admin.badge>
                                 </td>
-                                <td class="px-5 py-3.5">
-                                    <div class="flex items-center justify-end">
-                                        @if ($payment->instructor_paid_out)
-                                            <span class="text-xs text-slate-400">—</span>
-                                        @else
-                                            <form action="{{ route('admin.revenue.mark-paid', $payment) }}" method="POST" onsubmit="return confirm('Mark this payout as paid?');">
-                                                @csrf @method('PATCH')
-                                                <button type="submit" class="rounded-full bg-brand-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-950 transition">
-                                                    Mark as Paid
-                                                </button>
-                                            </form>
-                                        @endif
-                                    </div>
-                                </td>
+                                @if ($isAdmin)
+                                    <td class="px-5 py-3.5">
+                                        <div class="flex items-center justify-end">
+                                            @if ($payment->instructor_paid_out)
+                                                <span class="text-xs text-slate-400">—</span>
+                                            @else
+                                                <form action="{{ route('admin.revenue.mark-paid', $payment) }}" method="POST" onsubmit="return confirm('Mark this payout as paid?');">
+                                                    @csrf @method('PATCH')
+                                                    <button type="submit" class="rounded-full bg-brand-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-950 transition">
+                                                        Mark as Paid
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </td>
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-5 py-16 text-center text-slate-400">
+                                <td colspan="{{ $isAdmin ? 5 : 3 }}" class="px-5 py-16 text-center text-slate-400">
                                     <i class="fa-solid fa-sack-dollar text-2xl mb-2 block"></i>
                                     No payments in this date range.
                                 </td>

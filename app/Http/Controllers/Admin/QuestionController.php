@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\AuthorizesCourseOwnership;
 use App\Models\Lesson;
 use App\Models\Question;
 use Illuminate\Http\RedirectResponse;
@@ -9,8 +10,12 @@ use Illuminate\Http\Request;
 
 class QuestionController extends BaseAdminController
 {
+    use AuthorizesCourseOwnership;
+
     public function store(Request $request, Lesson $lesson): RedirectResponse
     {
+        $this->authorizeCourseAccess($lesson->course);
+
         $validated = $this->validateQuestion($request);
 
         return $this->tryActionBack(function () use ($lesson, $validated) {
@@ -26,6 +31,8 @@ class QuestionController extends BaseAdminController
 
     public function update(Request $request, Question $question): RedirectResponse
     {
+        $this->authorizeCourseAccess($question->lesson->course);
+
         $validated = $this->validateQuestion($request);
 
         return $this->tryActionBack(function () use ($question, $validated) {
@@ -40,6 +47,8 @@ class QuestionController extends BaseAdminController
 
     public function destroy(Question $question): RedirectResponse
     {
+        $this->authorizeCourseAccess($question->lesson->course);
+
         return $this->tryActionBack(function () use ($question) {
             $question->delete();
         }, 'Question removed.');

@@ -7,7 +7,9 @@
                 <div class="max-w-lg">
                     <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-950 tracking-tight">{{ $pageTitle }}</h2>
                     <p class="mt-1 text-sm font-semibold text-accent-600">
-                        @if ($isPendingView)
+                        @if (! $isAdmin)
+                            Courses you've created. New ones need admin approval before they go live.
+                        @elseif ($isPendingView)
                             Review and approve courses submitted by instructors.
                         @else
                             Manage every course on the platform.
@@ -26,10 +28,10 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('admin.courses.create') }}"
+                    <a href="{{ route($routePrefix.'.courses.create') }}"
                         class="flex-shrink-0 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-accent-400 to-accent-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-accent-600/30 hover:shadow-xl hover:-translate-y-0.5 transition">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-                        Add Course
+                        {{ $isAdmin ? 'Add Course' : 'New Course' }}
                     </a>
                 </div>
             </div>
@@ -110,15 +112,17 @@
                 class="w-36"
             />
 
-            <x-admin.searchable-select
-                name="instructor_id"
-                :options="$instructors->pluck('name', 'id')"
-                :selected="$selectedInstructor"
-                all-label="All Instructors"
-                pill
-                autosubmit
-                class="w-48"
-            />
+            @if ($isAdmin)
+                <x-admin.searchable-select
+                    name="instructor_id"
+                    :options="$instructors->pluck('name', 'id')"
+                    :selected="$selectedInstructor"
+                    all-label="All Instructors"
+                    pill
+                    autosubmit
+                    class="w-48"
+                />
+            @endif
 
             <button type="submit" class="rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-950 transition">Filter</button>
         </form>
@@ -130,7 +134,9 @@
                     <thead>
                         <tr class="bg-brand-50/60 text-left text-sm font-semibold uppercase tracking-wide text-brand-700">
                             <th class="px-5 py-3">Course</th>
-                            <th class="px-5 py-3">Instructor</th>
+                            @if ($isAdmin)
+                                <th class="px-5 py-3">Instructor</th>
+                            @endif
                             <th class="px-5 py-3">Category</th>
                             <th class="px-5 py-3">Content</th>
                             <th class="px-5 py-3">Students</th>
@@ -153,11 +159,24 @@
                                         </div>
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-brand-950 truncate max-w-xs" title="{{ $course->title }}">{{ $course->title }}</p>
-                                            <p class="text-xs text-slate-400">{{ ucfirst(str_replace('_', ' ', $course->level)) }}</p>
+                                            @if (! $isAdmin && $course->status === 'rejected' && $course->rejection_reason)
+                                                <p class="text-xs text-rose-500 truncate max-w-xs" title="{{ $course->rejection_reason }}">{{ $course->rejection_reason }}</p>
+                                            @else
+                                                <p class="text-xs text-slate-400">{{ ucfirst(str_replace('_', ' ', $course->level)) }}</p>
+                                            @endif
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-5 py-3.5 text-slate-600">{{ $course->instructor->name ?? '—' }}</td>
+                                @if ($isAdmin)
+                                    <td class="px-5 py-3.5 text-slate-600">
+                                        {{ $course->instructor->name ?? '—' }}
+                                        @if ($course->is_instructor)
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700" title="Created by the instructor themselves">Self-added</span>
+                                        @else
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500" title="Created by an admin">Admin-added</span>
+                                        @endif
+                                    </td>
+                                @endif
                                 <td class="px-5 py-3.5 text-slate-600">{{ $course->category->name ?? '—' }}</td>
                                 <td class="px-5 py-3.5 text-slate-500 text-xs">
                                     <p>{{ $course->sections_count }} Section{{ $course->sections_count === 1 ? '' : 's' }}</p>
@@ -181,31 +200,43 @@
                                     @endif
                                 </td>
                                 <td class="px-5 py-3.5">
-                                    <form action="{{ route('admin.courses.update-status', $course) }}" method="POST">
-                                        @csrf
-                                        @method('PATCH')
+                                    @if ($isAdmin)
+                                        <form action="{{ route('admin.courses.update-status', $course) }}" method="POST">
+                                            @csrf
+                                            @method('PATCH')
+                                            @php
+                                                $courseStatusColor = match ($course->status) {
+                                                    'active' => 'bg-emerald-50 text-emerald-700',
+                                                    'pending' => 'bg-amber-50 text-amber-700',
+                                                    'rejected' => 'bg-rose-50 text-rose-700',
+                                                    default => 'bg-slate-100 text-slate-600',
+                                                };
+                                            @endphp
+                                            <x-admin.searchable-select
+                                                name="status"
+                                                :options="['draft' => 'Draft', 'pending' => 'Pending', 'active' => 'Active', 'rejected' => 'Rejected']"
+                                                :selected="$course->status"
+                                                :button-class="$courseStatusColor.' border-0 text-xs font-semibold'"
+                                                pill
+                                                autosubmit
+                                                class="inline-block w-32"
+                                            />
+                                        </form>
+                                    @else
                                         @php
-                                            $courseStatusColor = match ($course->status) {
-                                                'active' => 'bg-emerald-50 text-emerald-700',
-                                                'pending' => 'bg-amber-50 text-amber-700',
-                                                'rejected' => 'bg-rose-50 text-rose-700',
-                                                default => 'bg-slate-100 text-slate-600',
+                                            $statusColor = match ($course->status) {
+                                                'active' => 'emerald',
+                                                'pending' => 'amber',
+                                                'rejected' => 'rose',
+                                                default => 'slate',
                                             };
                                         @endphp
-                                        <x-admin.searchable-select
-                                            name="status"
-                                            :options="['draft' => 'Draft', 'pending' => 'Pending', 'active' => 'Active', 'rejected' => 'Rejected']"
-                                            :selected="$course->status"
-                                            :button-class="$courseStatusColor.' border-0 text-xs font-semibold'"
-                                            pill
-                                            autosubmit
-                                            class="inline-block w-32"
-                                        />
-                                    </form>
+                                        <x-admin.badge :color="$statusColor">{{ $course->status === 'active' ? 'Live' : ucfirst($course->status) }}</x-admin.badge>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        @if ($course->status === 'pending')
+                                        @if ($isAdmin && $course->status === 'pending')
                                             <form action="{{ route('admin.courses.approve', $course) }}" method="POST">
                                                 @csrf
                                                 <button type="submit" class="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center" title="Approve">
@@ -216,16 +247,18 @@
                                                 <i class="fa-solid fa-xmark text-xs"></i>
                                             </button>
                                         @endif
-                                        <a href="{{ route('admin.courses.show', $course) }}" class="h-8 w-8 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center" title="Details">
-                                            <i class="fa-solid fa-eye text-xs"></i>
-                                        </a>
-                                        <a href="{{ route('admin.courses.builder', $course) }}" class="h-8 w-8 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center" title="Manage Content">
+                                        @if ($isAdmin)
+                                            <a href="{{ route('admin.courses.show', $course) }}" class="h-8 w-8 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center" title="Details">
+                                                <i class="fa-solid fa-eye text-xs"></i>
+                                            </a>
+                                        @endif
+                                        <a href="{{ route($routePrefix.'.courses.builder', $course) }}" class="h-8 w-8 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center" title="Manage Content">
                                             <i class="fa-solid fa-layer-group text-xs"></i>
                                         </a>
-                                        <a href="{{ route('admin.courses.edit', $course) }}" class="h-8 w-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center" title="Edit">
+                                        <a href="{{ route($routePrefix.'.courses.edit', $course) }}" class="h-8 w-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center" title="Edit">
                                             <i class="fa-solid fa-pen text-xs"></i>
                                         </a>
-                                        <form action="{{ route('admin.courses.destroy', $course) }}" method="POST" onsubmit="return confirm('Delete this course? This also removes its sections, lessons and enrollments.');">
+                                        <form action="{{ route($routePrefix.'.courses.destroy', $course) }}" method="POST" onsubmit="return confirm('Delete this course? This also removes its sections, lessons and enrollments.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center" title="Delete">
@@ -236,7 +269,7 @@
                                 </td>
                             </tr>
 
-                            @if ($course->status === 'pending')
+                            @if ($isAdmin && $course->status === 'pending')
                                 <div x-show="rejectOpen === {{ $course->id }}" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                                     <div class="absolute inset-0 bg-slate-900/60" @click="rejectOpen = null"></div>
                                     <div class="relative w-full max-w-md rounded-2xl bg-white shadow-xl p-6">
@@ -256,7 +289,7 @@
                             @endif
                         @empty
                             <tr>
-                                <td colspan="8" class="px-5 py-16 text-center text-slate-400">
+                                <td colspan="{{ $isAdmin ? 8 : 7 }}" class="px-5 py-16 text-center text-slate-400">
                                     <i class="fa-solid fa-book-open text-2xl mb-2 block"></i>
                                     No courses found.
                                 </td>

@@ -63,6 +63,9 @@ class RevenueController extends BaseAdminController
 
         return view('admin.revenue.index', [
             'tab' => $tab,
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
+            'indexUrl' => route('admin.revenue.index', $tab),
             'payments' => $query->paginate(15)->withQueryString(),
             'totals' => $totals,
             'paidOut' => $paidOut,

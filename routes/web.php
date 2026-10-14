@@ -12,6 +12,9 @@ use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Instructor\CourseController as InstructorCourseController;
+use App\Http\Controllers\Instructor\DashboardController as InstructorDashboardController;
+use App\Http\Controllers\Instructor\RevenueController as InstructorRevenueController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 
@@ -137,8 +140,14 @@ Route::middleware('web.auth')->group(function () {
     */
 
     Route::get('/dashboard', function () {
-        if (current_admin_user()?->role === 'admin') {
+        $user = current_admin_user();
+
+        if ($user?->role === 'admin') {
             return redirect()->route('admin.dashboard');
+        }
+
+        if ($user?->is_instructor) {
+            return redirect()->route('instructor.dashboard');
         }
 
         return view('dashboard.index');
@@ -240,4 +249,33 @@ Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group
     // Languages (settings sub-feature)
     Route::post('/languages', [LanguageController::class, 'store'])->name('languages.store');
     Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
+});
+
+Route::middleware(['web.auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {
+    Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/revenue', [InstructorRevenueController::class, 'index'])->name('revenue.index');
+
+    // Own courses
+    Route::get('/courses', [InstructorCourseController::class, 'index'])->name('courses.index');
+    Route::get('/courses/create', [InstructorCourseController::class, 'create'])->name('courses.create');
+    Route::post('/courses', [InstructorCourseController::class, 'store'])->name('courses.store');
+    Route::get('/courses/{course}/edit', [InstructorCourseController::class, 'edit'])->name('courses.edit');
+    Route::put('/courses/{course}', [InstructorCourseController::class, 'update'])->name('courses.update');
+    Route::delete('/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
+    Route::get('/courses/{course}/builder', [CourseController::class, 'builder'])->name('courses.builder');
+
+    // Course content builder (shared with admin, ownership-checked)
+    Route::post('/courses/{course}/sections', [SectionController::class, 'store'])->name('sections.store');
+    Route::post('/courses/{course}/sections/reorder', [SectionController::class, 'reorder'])->name('sections.reorder');
+    Route::put('/sections/{section}', [SectionController::class, 'update'])->name('sections.update');
+    Route::delete('/sections/{section}', [SectionController::class, 'destroy'])->name('sections.destroy');
+
+    Route::post('/sections/{section}/lessons', [LessonController::class, 'store'])->name('lessons.store');
+    Route::post('/sections/{section}/lessons/reorder', [LessonController::class, 'reorder'])->name('lessons.reorder');
+    Route::put('/lessons/{lesson}', [LessonController::class, 'update'])->name('lessons.update');
+    Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
+
+    Route::post('/lessons/{lesson}/questions', [QuestionController::class, 'store'])->name('questions.store');
+    Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
+    Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
 });

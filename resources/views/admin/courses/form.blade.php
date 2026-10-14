@@ -1,5 +1,8 @@
-@php $isEdit = $course->exists; @endphp
-<x-layouts.admin :title="$isEdit ? 'Edit Course' : 'Add Course'">
+@php
+    $isEdit = $course->exists;
+    $canChooseStatus = ! $isEdit || in_array($course->status, ['draft', 'rejected']);
+@endphp
+<x-layouts.admin :title="$isEdit ? 'Edit Course' : ($isAdmin ? 'Add Course' : 'New Course')">
     <div x-data="{
         categoryId: '{{ old('category_id', $course->category_id) }}',
         isFree: {{ old('is_free', $course->is_free) ? 'true' : 'false' }},
@@ -14,16 +17,39 @@
         }
     }">
         <div class="flex items-center gap-3 mb-6">
-            <a href="{{ route('admin.courses.index') }}" class="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-700">
+            <a href="{{ route($routePrefix.'.courses.index') }}" class="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-700">
                 <i class="fa-solid fa-arrow-left text-xs"></i>
             </a>
             <div>
-                <h2 class="text-2xl font-bold text-brand-950">{{ $isEdit ? 'Edit Course' : 'Add Course' }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">{{ $isEdit ? $course->title : 'Fill in the details to create a new course.' }}</p>
+                <h2 class="text-2xl font-bold text-brand-950">{{ $isEdit ? 'Edit Course' : ($isAdmin ? 'Add Course' : 'New Course') }}</h2>
+                <p class="text-sm text-slate-500 mt-0.5">
+                    @if ($isEdit)
+                        {{ $course->title }}
+                    @elseif ($isAdmin)
+                        Fill in the details to create a new course.
+                    @else
+                        Fill in the details, then submit for admin review.
+                    @endif
+                </p>
             </div>
         </div>
 
-        <form action="{{ $isEdit ? route('admin.courses.update', $course) : route('admin.courses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+        @if (! $isAdmin && $isEdit && $course->status === 'rejected' && $course->rejection_reason)
+            <div class="mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                <div>
+                    <p class="font-semibold">This course was rejected</p>
+                    <p>{{ $course->rejection_reason }}</p>
+                </div>
+            </div>
+        @elseif (! $isAdmin && $isEdit && $course->status === 'pending')
+            <div class="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <i class="fa-solid fa-hourglass-half mt-0.5"></i>
+                <span>This course is waiting for admin review. You can still edit it — your changes save immediately.</span>
+            </div>
+        @endif
+
+        <form action="{{ $isEdit ? route($routePrefix.'.courses.update', $course) : route($routePrefix.'.courses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
             @csrf
             @if ($isEdit) @method('PUT') @endif
 
@@ -48,15 +74,17 @@
                         <textarea name="description" class="tinymce-editor">{{ old('description', $course->description) }}</textarea>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1.5">Instructor <span class="text-rose-500">*</span></label>
-                        <x-admin.searchable-select
-                            name="user_id"
-                            :options="$instructors->pluck('name', 'id')"
-                            :selected="old('user_id', $course->user_id)"
-                            required
-                        />
-                    </div>
+                    @if ($isAdmin)
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Instructor <span class="text-rose-500">*</span></label>
+                            <x-admin.searchable-select
+                                name="user_id"
+                                :options="$instructors->pluck('name', 'id')"
+                                :selected="old('user_id', $course->user_id)"
+                                required
+                            />
+                        </div>
+                    @endif
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Language</label>
@@ -108,14 +136,16 @@
                         />
                     </div>
 
-                    <div class="sm:col-span-2">
-                        <label class="inline-flex items-center gap-2">
-                            <input type="hidden" name="is_top_course" value="0">
-                            <input type="checkbox" name="is_top_course" value="1" @checked(old('is_top_course', $course->is_top_course))
-                                class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                            <span class="text-sm text-slate-700">Feature this as a top course</span>
-                        </label>
-                    </div>
+                    @if ($isAdmin)
+                        <div class="sm:col-span-2">
+                            <label class="inline-flex items-center gap-2">
+                                <input type="hidden" name="is_top_course" value="0">
+                                <input type="checkbox" name="is_top_course" value="1" @checked(old('is_top_course', $course->is_top_course))
+                                    class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span class="text-sm text-slate-700">Feature this as a top course</span>
+                            </label>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -226,10 +256,24 @@
             </div>
 
             <div class="flex justify-end gap-2">
-                <a href="{{ route('admin.courses.index') }}" class="rounded-lg px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Cancel</a>
-                <button type="submit" class="rounded-full bg-gradient-to-r from-accent-400 to-accent-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-accent-600/30 hover:shadow-lg transition">
-                    {{ $isEdit ? 'Save Changes' : 'Create Course' }}
-                </button>
+                <a href="{{ route($routePrefix.'.courses.index') }}" class="rounded-lg px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Cancel</a>
+
+                @if ($isAdmin)
+                    <button type="submit" class="rounded-full bg-gradient-to-r from-accent-400 to-accent-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-accent-600/30 hover:shadow-lg transition">
+                        {{ $isEdit ? 'Save Changes' : 'Create Course' }}
+                    </button>
+                @elseif ($canChooseStatus)
+                    <button type="submit" name="action" value="draft" class="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                        Save as Draft
+                    </button>
+                    <button type="submit" name="action" value="submit" class="rounded-full bg-gradient-to-r from-accent-400 to-accent-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-accent-600/30 hover:shadow-lg transition">
+                        {{ $isEdit && $course->status === 'rejected' ? 'Resubmit for Review' : 'Submit for Review' }}
+                    </button>
+                @else
+                    <button type="submit" class="rounded-full bg-gradient-to-r from-accent-400 to-accent-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-accent-600/30 hover:shadow-lg transition">
+                        Save Changes
+                    </button>
+                @endif
             </div>
         </form>
     </div>

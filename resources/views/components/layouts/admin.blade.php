@@ -1,9 +1,10 @@
+@php $inInstructorPortal = request()->routeIs('instructor.*'); @endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $title ?? 'Admin' }} · EduSphere</title>
+    <title>{{ $title ?? ($inInstructorPortal ? 'Instructor' : 'Admin') }} · EduSphere</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,69 +34,111 @@
             </div>
 
             <nav class="relative flex-1 overflow-y-auto overflow-x-hidden admin-scroll px-3 py-6 space-y-6">
-                <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Overview</p>
-                    <x-admin.nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')" label="Dashboard">
-                        <x-admin.icon name="dashboard" />
-                        <span x-show="!collapsed" x-cloak>Dashboard</span>
-                    </x-admin.nav-link>
-                </div>
-
-                <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Catalog</p>
-                    <div class="space-y-1">
-                        <x-admin.nav-link :href="route('admin.categories.index')" :active="request()->routeIs('admin.categories.*')" label="Categories">
-                            <x-admin.icon name="categories" />
-                            <span x-show="!collapsed" x-cloak>Categories</span>
-                        </x-admin.nav-link>
-                        <x-admin.nav-link :href="route('admin.courses.index')" :active="request()->routeIs('admin.courses.*') && !request()->routeIs('admin.courses.pending')" label="Courses">
-                            <x-admin.icon name="courses" />
-                            <span x-show="!collapsed" x-cloak>Courses</span>
-                        </x-admin.nav-link>
-                        <x-admin.nav-link :href="route('admin.courses.pending')" :active="request()->routeIs('admin.courses.pending')" label="Pending Courses">
-                            <x-admin.icon name="pending" />
-                            <span x-show="!collapsed" x-cloak>Pending Courses</span>
+                @if ($inInstructorPortal)
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Overview</p>
+                        <x-admin.nav-link :href="route('instructor.dashboard')" :active="request()->routeIs('instructor.dashboard')" label="Dashboard">
+                            <x-admin.icon name="dashboard" />
+                            <span x-show="!collapsed" x-cloak>Dashboard</span>
                         </x-admin.nav-link>
                     </div>
-                </div>
 
-                <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">People</p>
-                    <div class="space-y-1">
-                        <x-admin.nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')" label="Users">
-                            <x-admin.icon name="users" />
-                            <span x-show="!collapsed" x-cloak>Users</span>
-                        </x-admin.nav-link>
-                        <x-admin.nav-link :href="route('admin.enrollments.index')" :active="request()->routeIs('admin.enrollments.index')" label="Enrollment History">
-                            <x-admin.icon name="enrollment" />
-                            <span x-show="!collapsed" x-cloak>Enrollment History</span>
-                        </x-admin.nav-link>
-                        <x-admin.nav-link :href="route('admin.enrollments.create')" :active="request()->routeIs('admin.enrollments.create')" label="Enroll Student">
-                            <x-admin.icon name="enrollment" />
-                            <span x-show="!collapsed" x-cloak>Enroll Student</span>
-                        </x-admin.nav-link>
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Teaching</p>
+                        <div class="space-y-1">
+                            <x-admin.nav-link :href="route('instructor.courses.index')" :active="request()->routeIs('instructor.courses.*')" label="My Courses">
+                                <x-admin.icon name="courses" />
+                                <span x-show="!collapsed" x-cloak>My Courses</span>
+                            </x-admin.nav-link>
+                            <x-admin.nav-link :href="route('instructor.courses.create')" :active="request()->routeIs('instructor.courses.create')" label="New Course">
+                                <x-admin.icon name="pending" />
+                                <span x-show="!collapsed" x-cloak>New Course</span>
+                            </x-admin.nav-link>
+                        </div>
                     </div>
-                </div>
 
-                <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Finance</p>
-                    <div class="space-y-1">
-                        <x-admin.nav-link :href="route('admin.revenue.index')" :active="request()->routeIs('admin.revenue.*')" label="Revenue">
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Finance</p>
+                        <x-admin.nav-link :href="route('instructor.revenue.index')" :active="request()->routeIs('instructor.revenue.*')" label="Revenue">
                             <x-admin.icon name="revenue" />
                             <span x-show="!collapsed" x-cloak>Revenue</span>
                         </x-admin.nav-link>
                     </div>
-                </div>
 
-                <div>
-                    <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">System</p>
-                    <div class="space-y-1">
-                        <x-admin.nav-link :href="route('admin.settings.index')" :active="request()->routeIs('admin.settings.*')" label="Settings">
-                            <x-admin.icon name="settings" />
-                            <span x-show="!collapsed" x-cloak>Settings</span>
+                    @if (current_admin_user()?->isAdmin())
+                        <div>
+                            <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Admin</p>
+                            <x-admin.nav-link :href="route('admin.dashboard')" :active="false" label="Back to Admin">
+                                <x-admin.icon name="settings" />
+                                <span x-show="!collapsed" x-cloak>Back to Admin</span>
+                            </x-admin.nav-link>
+                        </div>
+                    @endif
+                @else
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Overview</p>
+                        <x-admin.nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')" label="Dashboard">
+                            <x-admin.icon name="dashboard" />
+                            <span x-show="!collapsed" x-cloak>Dashboard</span>
                         </x-admin.nav-link>
                     </div>
-                </div>
+
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Catalog</p>
+                        <div class="space-y-1">
+                            <x-admin.nav-link :href="route('admin.categories.index')" :active="request()->routeIs('admin.categories.*')" label="Categories">
+                                <x-admin.icon name="categories" />
+                                <span x-show="!collapsed" x-cloak>Categories</span>
+                            </x-admin.nav-link>
+                            <x-admin.nav-link :href="route('admin.courses.index')" :active="request()->routeIs('admin.courses.*') && !request()->routeIs('admin.courses.pending')" label="Courses">
+                                <x-admin.icon name="courses" />
+                                <span x-show="!collapsed" x-cloak>Courses</span>
+                            </x-admin.nav-link>
+                            <x-admin.nav-link :href="route('admin.courses.pending')" :active="request()->routeIs('admin.courses.pending')" label="Pending Courses">
+                                <x-admin.icon name="pending" />
+                                <span x-show="!collapsed" x-cloak>Pending Courses</span>
+                            </x-admin.nav-link>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">People</p>
+                        <div class="space-y-1">
+                            <x-admin.nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')" label="Users">
+                                <x-admin.icon name="users" />
+                                <span x-show="!collapsed" x-cloak>Users</span>
+                            </x-admin.nav-link>
+                            <x-admin.nav-link :href="route('admin.enrollments.index')" :active="request()->routeIs('admin.enrollments.index')" label="Enrollment History">
+                                <x-admin.icon name="enrollment" />
+                                <span x-show="!collapsed" x-cloak>Enrollment History</span>
+                            </x-admin.nav-link>
+                            <x-admin.nav-link :href="route('admin.enrollments.create')" :active="request()->routeIs('admin.enrollments.create')" label="Enroll Student">
+                                <x-admin.icon name="enrollment" />
+                                <span x-show="!collapsed" x-cloak>Enroll Student</span>
+                            </x-admin.nav-link>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">Finance</p>
+                        <div class="space-y-1">
+                            <x-admin.nav-link :href="route('admin.revenue.index')" :active="request()->routeIs('admin.revenue.*')" label="Revenue">
+                                <x-admin.icon name="revenue" />
+                                <span x-show="!collapsed" x-cloak>Revenue</span>
+                            </x-admin.nav-link>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p x-show="!collapsed" x-cloak class="px-3 text-xs font-semibold uppercase tracking-wider text-brand-200 mb-2">System</p>
+                        <div class="space-y-1">
+                            <x-admin.nav-link :href="route('admin.settings.index')" :active="request()->routeIs('admin.settings.*')" label="Settings">
+                                <x-admin.icon name="settings" />
+                                <span x-show="!collapsed" x-cloak>Settings</span>
+                            </x-admin.nav-link>
+                        </div>
+                    </div>
+                @endif
             </nav>
 
             <div class="relative border-t border-white/15 p-4">
@@ -127,9 +170,9 @@
 
                     <div class="flex items-center gap-2.5 pl-4 border-l border-slate-200">
                         <div class="h-9 w-9 rounded-full bg-brand-900 text-white flex items-center justify-center font-semibold text-sm">
-                            {{ strtoupper(substr(current_admin_user()->name ?? 'A', 0, 1)) }}
+                            {{ strtoupper(substr(current_admin_user()->name ?? ($inInstructorPortal ? 'I' : 'A'), 0, 1)) }}
                         </div>
-                        <span class="hidden sm:inline text-sm font-semibold text-slate-700">{{ current_admin_user()->name ?? 'Admin' }}</span>
+                        <span class="hidden sm:inline text-sm font-semibold text-slate-700">{{ current_admin_user()->name ?? ($inInstructorPortal ? 'Instructor' : 'Admin') }}</span>
                         <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                     </div>
                 </div>
