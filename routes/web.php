@@ -4,43 +4,181 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EnrollmentController;
+use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\LessonController;
 use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\RevenueController;
 use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Auth\TempLoginController;
+use Illuminate\Http\Request;
 use App\Http\Controllers\Instructor\CourseController as InstructorCourseController;
 use App\Http\Controllers\Instructor\DashboardController as InstructorDashboardController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthController;
+
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Home
 |--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
+})->name('login');
+
+
+/*
+|--------------------------------------------------------------------------
+| Guest Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('guest')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/login', [
+        AuthController::class,
+        'showLogin'
+    ])->name('login');
+
+    Route::post('/login', [
+        AuthController::class,
+        'login'
+    ])->name('login.submit');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Register
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/register', [
+        AuthController::class,
+        'showRegister'
+    ])->name('register');
+
+    Route::post('/register', [
+        AuthController::class,
+        'register'
+    ])->name('register.submit');
+
 });
 
-// TEMPORARY — remove once the real auth flow (login/register/forgot) is merged.
-Route::get('/login', [TempLoginController::class, 'create'])->name('login')->middleware('guest');
-Route::post('/login', [TempLoginController::class, 'store'])->middleware('guest');
-Route::post('/logout', [TempLoginController::class, 'destroy'])->name('logout')->middleware('auth');
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+/*
+|--------------------------------------------------------------------------
+| Forgot Password
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/forgot-password', function () {
+    return view('auth.forgot-password');
+})->name('password.request');
+
+
+/*
+|--------------------------------------------------------------------------
+| Reset Password
+|--------------------------------------------------------------------------
+|
+| Password reset email opens:
+|
+| /reset-password?token=XXXXX&email=XXXXX
+|
+*/
+Route::get('/reset-password', [
+    AuthController::class,
+    'showResetPassword'
+])->name('password.reset');
+/*
+|--------------------------------------------------------------------------
+| Device Verification
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/verify-device', [
+    AuthController::class,
+    'verifyDevice'
+])->name('verify.device');
+
+
+/*
+|--------------------------------------------------------------------------
+| Establish Web Session
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/web/session', [
+    AuthController::class,
+    'establishSession'
+])
+->middleware('device.identification')
+->name('web.session');
+
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Web Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('web.auth')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/dashboard', function () {
+        if (current_admin_user()?->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return view('dashboard.index');
+    })->name('dashboard');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current User
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/me', [
+        AuthController::class,
+        'me'
+    ])->name('me');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/logout', [
+        AuthController::class,
+        'logout'
+    ])->name('logout');
+
+});
+
+Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Categories
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+    Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
     Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
 
@@ -49,6 +187,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/courses/pending', [CourseController::class, 'pending'])->name('courses.pending');
     Route::get('/courses/create', [CourseController::class, 'create'])->name('courses.create');
     Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
+    Route::get('/courses/{course}', [CourseController::class, 'show'])->name('courses.show');
     Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])->name('courses.edit');
     Route::put('/courses/{course}', [CourseController::class, 'update'])->name('courses.update');
     Route::delete('/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
@@ -76,20 +215,33 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-    Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::patch('/users/{user}/status', [UserController::class, 'updateStatus'])->name('users.update-status');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
     // Enrollment history
     Route::get('/enrollments', [EnrollmentController::class, 'index'])->name('enrollments.index');
+    Route::get('/enrollments/create', [EnrollmentController::class, 'create'])->name('enrollments.create');
+    Route::post('/enrollments', [EnrollmentController::class, 'store'])->name('enrollments.store');
+    Route::get('/enrollments/{enrollment}', [EnrollmentController::class, 'show'])->name('enrollments.show');
+    Route::get('/enrollments/{enrollment}/edit', [EnrollmentController::class, 'edit'])->name('enrollments.edit');
+    Route::put('/enrollments/{enrollment}', [EnrollmentController::class, 'update'])->name('enrollments.update');
+    Route::delete('/enrollments/{enrollment}', [EnrollmentController::class, 'destroy'])->name('enrollments.destroy');
 
     // Revenue
-    Route::get('/revenue', [RevenueController::class, 'index'])->name('revenue.index');
+    Route::get('/revenue/{tab?}', [RevenueController::class, 'index'])->name('revenue.index');
+    Route::delete('/revenue/{payment}', [RevenueController::class, 'destroy'])->name('revenue.destroy');
+    Route::patch('/revenue/{payment}/mark-paid', [RevenueController::class, 'markPaid'])->name('revenue.mark-paid');
 
     // Settings
     Route::get('/settings/{tab?}', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings/{tab}', [SettingController::class, 'update'])->name('settings.update');
+
+    // Languages (settings sub-feature)
+    Route::post('/languages', [LanguageController::class, 'store'])->name('languages.store');
+    Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
 });
 
 Route::middleware(['auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {

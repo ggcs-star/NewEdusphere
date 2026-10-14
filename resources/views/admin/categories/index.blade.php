@@ -12,7 +12,7 @@
                 <div class="flex items-center gap-8">
                     {{-- Decorative cluster --}}
                     <div class="hidden lg:block relative w-20 h-20 flex-shrink-0">
-                        <div class="h-20 w-20 rounded-3xl bg-brand-700 rotate-6 shadow-xl flex items-center justify-center">
+                        <div class="h-20 w-20 rounded-3xl bg-brand-500 rotate-6 shadow-xl flex items-center justify-center">
                             <i class="fa-solid fa-graduation-cap text-3xl text-accent-400 -rotate-6"></i>
                         </div>
                         <div class="absolute -bottom-3 -left-4 h-10 w-14 rounded-xl bg-accent-500 shadow-lg flex items-center justify-center -rotate-12">
@@ -36,12 +36,15 @@
         <form method="GET" class="flex flex-wrap items-center gap-3 mb-6">
             <x-admin.search-input :value="$search" placeholder="Search categories..." />
 
-            <select name="status" onchange="this.form.submit()"
-                class="rounded-full bg-white border border-slate-200 px-4 py-2.5 text-sm text-slate-600 focus:ring-2 focus:ring-brand-200 outline-none">
-                <option value="all" @selected($selectedStatus == 'all')>All Status</option>
-                <option value="active" @selected($selectedStatus == 'active')>Active</option>
-                <option value="inactive" @selected($selectedStatus == 'inactive')>Inactive</option>
-            </select>
+            <x-admin.searchable-select
+                name="status"
+                :options="['active' => 'Active', 'inactive' => 'Inactive']"
+                :selected="$selectedStatus"
+                all-label="All Status"
+                pill
+                autosubmit
+                class="w-40"
+            />
 
             <button type="submit" class="rounded-full bg-brand-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-950 transition">Filter</button>
         </form>
@@ -58,7 +61,7 @@
                 @foreach ($categories as $category)
                     <div class="relative rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-lg transition overflow-visible flex flex-col">
                         {{-- Header --}}
-                        <div class="relative h-24 rounded-t-2xl bg-gradient-to-br from-brand-700 to-brand-900 overflow-hidden">
+                        <div class="relative h-24 rounded-t-2xl bg-brand-500 overflow-hidden">
                             @if ($category->thumbnail)
                                 <img src="{{ Storage::url($category->thumbnail) }}" alt="{{ $category->name }}" class="absolute inset-0 h-full w-full object-cover opacity-40">
                             @endif
@@ -92,9 +95,10 @@
                         <div class="pt-9 pb-5 px-5 flex-1 flex flex-col">
                             <div class="flex items-center justify-between gap-2">
                                 <h3 class="text-lg font-bold text-brand-950">{{ $category->name }}</h3>
-                                <span class="h-8 w-8 flex-shrink-0 rounded-full bg-brand-50 text-brand-700 flex items-center justify-center">
+                                <a href="{{ route('admin.categories.show', $category) }}" title="Details"
+                                    class="h-8 w-8 flex-shrink-0 rounded-full bg-brand-50 text-brand-700 hover:bg-brand-100 flex items-center justify-center transition">
                                     <i class="fa-solid fa-arrow-right text-xs"></i>
-                                </span>
+                                </a>
                             </div>
                             <span class="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
                                 <i class="fa-solid fa-folder text-[10px]"></i>
