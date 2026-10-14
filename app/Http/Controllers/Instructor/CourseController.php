@@ -7,22 +7,27 @@ use App\Http\Controllers\Admin\BaseAdminController;
 use App\Models\Category;
 use App\Models\Course;
 use App\Services\FileUploadService;
+use App\Services\TrendStatsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class CourseController extends BaseAdminController
 {
     use GeneratesUniqueSlugs;
 
-    public function __construct(private readonly FileUploadService $uploads)
-    {
+    public function __construct(
+        private readonly FileUploadService $uploads,
+        private readonly TrendStatsService $trends,
+    ) {
     }
 
     public function index(Request $request): View
     {
-        $query = Course::where('user_id', Auth::id())
+        $userId = current_admin_user()->id;
+
+        $query = Course::where('user_id', $userId)
+            ->with('category')
             ->withCount(['sections', 'lessons', 'enrollments'])
             ->latest();
 
@@ -36,18 +41,46 @@ class CourseController extends BaseAdminController
             $query->where('title', 'like', "%{$search}%");
         }
 
-        return view('instructor.courses.index', [
+        if ($categoryId = $request->get('category_id')) {
+            if ($categoryId !== 'all') {
+                $query->where('category_id', $categoryId);
+            }
+        }
+
+        $price = $request->get('price', 'all');
+        if ($price === 'free') {
+            $query->where('is_free', true);
+        } elseif ($price === 'paid') {
+            $query->where('is_free', false);
+        }
+
+        return view('admin.courses.index', [
             'courses' => $query->paginate(10)->withQueryString(),
+            'categories' => Category::topLevel()->orderBy('name')->get(),
+            'selectedCategory' => $request->get('category_id', 'all'),
             'selectedStatus' => $request->get('status', 'all'),
+            'selectedPrice' => $price,
             'search' => $request->get('search', ''),
+            'pageTitle' => 'My Courses',
+            'isPendingView' => false,
+            'isAdmin' => false,
+            'routePrefix' => 'instructor',
+            'stats' => [
+                'active' => $this->trends->forModel(Course::class, fn ($q) => $q->where('user_id', $userId)->where('status', 'active')),
+                'pending' => $this->trends->forModel(Course::class, fn ($q) => $q->where('user_id', $userId)->where('status', 'pending')),
+                'free' => $this->trends->forModel(Course::class, fn ($q) => $q->where('user_id', $userId)->where('is_free', true)),
+                'paid' => $this->trends->forModel(Course::class, fn ($q) => $q->where('user_id', $userId)->where('is_free', false)),
+            ],
         ]);
     }
 
     public function create(): View
     {
-        return view('instructor.courses.form', [
+        return view('admin.courses.form', [
             'course' => new Course(),
             'categories' => Category::topLevel()->with('children')->orderBy('name')->get(),
+            'isAdmin' => false,
+            'routePrefix' => 'instructor',
         ]);
     }
 
@@ -56,7 +89,8 @@ class CourseController extends BaseAdminController
         return $this->tryAction(function () use ($request) {
             $validated = $this->validateCourse($request);
             $validated = $this->applyDerivedFields($request, $validated);
-            $validated['user_id'] = Auth::id();
+            $validated['user_id'] = current_admin_user()->id;
+            $validated['is_instructor'] = true;
             $validated['status'] = $request->input('action') === 'submit' ? 'pending' : 'draft';
             $validated['slug'] = $this->uniqueSlug(Course::class, $validated['title']);
 
@@ -72,9 +106,11 @@ class CourseController extends BaseAdminController
     {
         $this->authorizeOwnership($course);
 
-        return view('instructor.courses.form', [
+        return view('admin.courses.form', [
             'course' => $course,
             'categories' => Category::topLevel()->with('children')->orderBy('name')->get(),
+            'isAdmin' => false,
+            'routePrefix' => 'instructor',
         ]);
     }
 
@@ -105,7 +141,7 @@ class CourseController extends BaseAdminController
 
     private function authorizeOwnership(Course $course): void
     {
-        abort_unless($course->user_id === Auth::id(), 403);
+        abort_unless($course->user_id === current_admin_user()?->id, 403);
     }
 
     private function validateCourse(Request $request): array

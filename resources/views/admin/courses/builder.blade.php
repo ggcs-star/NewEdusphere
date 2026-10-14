@@ -19,7 +19,14 @@
             </a>
             <div class="flex-1">
                 <h2 class="text-2xl font-bold text-brand-950">{{ $course->title }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">Build out sections, lessons and quizzes for this course.</p>
+                <p class="text-sm text-slate-500 mt-0.5">
+                    @if ($isAdmin)
+                        by <span class="font-semibold text-slate-700">{{ $course->instructor->name ?? '—' }}</span>
+                        @if ($course->category) &middot; {{ $course->category->name }} @endif
+                    @else
+                        Build out sections, lessons and quizzes for this course.
+                    @endif
+                </p>
             </div>
             <x-admin.badge :color="$course->statusColor()">{{ ucfirst($course->status) }}</x-admin.badge>
             @if ($course->sections->count() > 1)

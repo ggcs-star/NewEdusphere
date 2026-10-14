@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\UserController;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Instructor\CourseController as InstructorCourseController;
 use App\Http\Controllers\Instructor\DashboardController as InstructorDashboardController;
+use App\Http\Controllers\Instructor\RevenueController as InstructorRevenueController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 
@@ -139,8 +140,14 @@ Route::middleware('web.auth')->group(function () {
     */
 
     Route::get('/dashboard', function () {
-        if (current_admin_user()?->role === 'admin') {
+        $user = current_admin_user();
+
+        if ($user?->role === 'admin') {
             return redirect()->route('admin.dashboard');
+        }
+
+        if ($user?->is_instructor) {
+            return redirect()->route('instructor.dashboard');
         }
 
         return view('dashboard.index');
@@ -244,8 +251,9 @@ Route::middleware(['web.auth', 'admin'])->prefix('admin')->name('admin.')->group
     Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
 });
 
-Route::middleware(['auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {
+Route::middleware(['web.auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {
     Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/revenue', [InstructorRevenueController::class, 'index'])->name('revenue.index');
 
     // Own courses
     Route::get('/courses', [InstructorCourseController::class, 'index'])->name('courses.index');

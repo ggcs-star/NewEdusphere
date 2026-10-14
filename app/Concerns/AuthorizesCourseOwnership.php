@@ -14,7 +14,7 @@ trait AuthorizesCourseOwnership
 {
     protected function authorizeCourseAccess(Course $course): void
     {
-        $user = auth()->user();
+        $user = current_admin_user();
 
         abort_unless($user && ($user->isAdmin() || $course->user_id === $user->id), 403);
     }

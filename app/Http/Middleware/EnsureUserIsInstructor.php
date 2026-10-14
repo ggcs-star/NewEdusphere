@@ -15,7 +15,7 @@ class EnsureUserIsInstructor
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        $user = current_admin_user();
 
         if (! $user || (! $user->is_instructor && ! $user->isAdmin())) {
             abort(403, 'This area is restricted to instructors.');

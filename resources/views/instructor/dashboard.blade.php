@@ -1,9 +1,9 @@
-<x-layouts.instructor title="Dashboard">
+<x-layouts.admin title="Dashboard">
     {{-- Welcome banner --}}
     <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-50 to-brand-100 px-6 sm:px-8 py-5 mb-8">
         <div class="relative z-10 flex flex-wrap items-center justify-between gap-6">
             <div class="max-w-lg">
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-950 tracking-tight">Welcome back, {{ auth()->user()->name }}</h2>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-950 tracking-tight">Welcome back, {{ current_admin_user()->name ?? 'Instructor' }}</h2>
                 <p class="mt-1 text-sm font-semibold text-accent-600">Create courses, track reviews, and see how your students are growing.</p>
             </div>
 
@@ -39,23 +39,23 @@
         @else
             <div class="divide-y divide-slate-100">
                 @foreach ($recentCourses as $course)
+                    @php
+                        $statusColor = match ($course->status) {
+                            'active' => 'emerald',
+                            'pending' => 'amber',
+                            'rejected' => 'rose',
+                            default => 'slate',
+                        };
+                    @endphp
                     <div class="flex items-center justify-between py-3">
                         <div class="min-w-0">
                             <a href="{{ route('instructor.courses.edit', $course) }}" class="text-sm font-semibold text-brand-950 hover:text-brand-700 truncate block" title="{{ $course->title }}">{{ $course->title }}</a>
                             <p class="text-xs text-slate-400">{{ $course->enrollments_count }} student{{ $course->enrollments_count === 1 ? '' : 's' }}</p>
                         </div>
-                        <span class="flex-shrink-0 rounded-full px-3 py-1 text-xs font-semibold
-                            @switch($course->status)
-                                @case('active') bg-emerald-50 text-emerald-700 @break
-                                @case('pending') bg-amber-50 text-amber-700 @break
-                                @case('rejected') bg-rose-50 text-rose-700 @break
-                                @default bg-slate-100 text-slate-600
-                            @endswitch">
-                            {{ ucfirst($course->status) }}
-                        </span>
+                        <x-admin.badge :color="$statusColor" class="flex-shrink-0">{{ ucfirst($course->status) }}</x-admin.badge>
                     </div>
                 @endforeach
             </div>
         @endif
     </div>
-</x-layouts.instructor>
+</x-layouts.admin>

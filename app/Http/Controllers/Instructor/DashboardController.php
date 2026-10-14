@@ -4,14 +4,13 @@ namespace App\Http\Controllers\Instructor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
     public function index(): View
     {
-        $courses = Course::where('user_id', Auth::id())->withCount('enrollments')->get();
+        $courses = Course::where('user_id', current_admin_user()->id)->withCount('enrollments')->get();
 
         return view('instructor.dashboard', [
             'stats' => [

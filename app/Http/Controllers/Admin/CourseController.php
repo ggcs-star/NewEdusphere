@@ -75,6 +75,8 @@ class CourseController extends BaseAdminController
             'search' => $request->get('search', ''),
             'pageTitle' => $title,
             'isPendingView' => $forcedStatus === 'pending',
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
             'stats' => [
                 'active' => $this->trends->forModel(Course::class, fn ($q) => $q->where('status', 'active')),
                 'pending' => $this->trends->forModel(Course::class, fn ($q) => $q->where('status', 'pending')),
@@ -90,6 +92,8 @@ class CourseController extends BaseAdminController
             'course' => new Course(),
             'categories' => Category::topLevel()->with('children')->orderBy('name')->get(),
             'instructors' => User::orderBy('name')->get(),
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
         ]);
     }
 
@@ -99,6 +103,7 @@ class CourseController extends BaseAdminController
             $validated = $this->validateCourse($request);
             $validated = $this->applyDerivedFields($request, $validated);
             $validated['slug'] = $this->uniqueSlug(Course::class, $validated['title']);
+            $validated['is_instructor'] = false;
 
             $course = Course::create($validated);
 
@@ -128,6 +133,8 @@ class CourseController extends BaseAdminController
             'course' => $course,
             'categories' => Category::topLevel()->with('children')->orderBy('name')->get(),
             'instructors' => User::orderBy('name')->get(),
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
         ]);
     }
 
@@ -190,11 +197,14 @@ class CourseController extends BaseAdminController
     {
         $this->authorizeCourseAccess($course);
 
-        $course->load(['sections.lessons.questions']);
+        $course->load(['sections.lessons.questions', 'instructor', 'category']);
+
+        $routePrefix = request()->routeIs('instructor.*') ? 'instructor' : 'admin';
 
         return view('admin.courses.builder', [
             'course' => $course,
-            'routePrefix' => request()->routeIs('instructor.*') ? 'instructor' : 'admin',
+            'routePrefix' => $routePrefix,
+            'isAdmin' => $routePrefix === 'admin',
         ]);
     }
 
