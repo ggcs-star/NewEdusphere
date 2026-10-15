@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\AuthorizesCourseOwnership;
 use App\Models\Section;
 use App\Models\Lesson;
 use App\Services\FileUploadService;
@@ -17,8 +18,12 @@ class LessonController extends BaseAdminController
     ) {
     }
 
+    use AuthorizesCourseOwnership;
+
     public function store(Request $request, Section $section): RedirectResponse
     {
+        $this->authorizeCourseAccess($section->course);
+
         $validated = $this->validateLesson($request);
         $validated = $this->applyUploads($request, $validated);
 
@@ -33,6 +38,8 @@ class LessonController extends BaseAdminController
 
     public function update(Request $request, Lesson $lesson): RedirectResponse
     {
+        $this->authorizeCourseAccess($lesson->course);
+
         $validated = $this->validateLesson($request);
         $validated = $this->applyUploads($request, $validated, $lesson);
 
@@ -72,6 +79,8 @@ class LessonController extends BaseAdminController
 
     public function destroy(Lesson $lesson): RedirectResponse
     {
+        $this->authorizeCourseAccess($lesson->course);
+
         return $this->tryActionBack(function () use ($lesson) {
             $lesson->delete();
         }, 'Lesson removed.');
@@ -79,6 +88,8 @@ class LessonController extends BaseAdminController
 
     public function reorder(Request $request, Section $section): JsonResponse
     {
+        $this->authorizeCourseAccess($section->course);
+
         $validated = $request->validate([
             'order' => ['required', 'array'],
             'order.*' => ['integer'],

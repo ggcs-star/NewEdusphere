@@ -62,6 +62,7 @@ class Kernel extends HttpKernel
 
         'web.auth' => \App\Http\Middleware\WebAuthMiddleware::class,
 
+        'instructor' => \App\Http\Middleware\EnsureUserIsInstructor::class,
         'auth.basic' =>
             \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
 

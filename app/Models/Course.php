@@ -13,6 +13,7 @@ class Course extends Model
 
     protected $fillable = [
         'user_id',
+        'is_instructor',
         'category_id',
         'sub_category_id',
         'title',
@@ -40,6 +41,7 @@ class Course extends Model
         'outcomes' => 'array',
         'requirements' => 'array',
         'is_free' => 'boolean',
+        'is_instructor' => 'boolean',
         'is_top_course' => 'boolean',
         'price' => 'decimal:2',
         'discount_price' => 'decimal:2',

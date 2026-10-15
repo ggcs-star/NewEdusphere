@@ -19,6 +19,9 @@ use App\Http\Controllers\Frontend\MyCoursesController;
 use App\Models\Category;
 use App\Models\Course;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Instructor\CourseController as InstructorCourseController;
+use App\Http\Controllers\Instructor\DashboardController as InstructorDashboardController;
+use App\Http\Controllers\Instructor\RevenueController as InstructorRevenueController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -204,6 +207,14 @@ Route::middleware('web.auth')->group(function () {
 
         if ($user?->role === 'admin') {
             return redirect()->route('admin.dashboard');
+        }
+
+        if ($user?->is_instructor) {
+            return redirect()->route('instructor.dashboard');
+        }
+
+        if ($user?->is_instructor) {
+            return redirect()->route('instructor.dashboard');
         }
 
         $userId = $user?->id;
@@ -650,4 +661,196 @@ Route::middleware(['web.auth', 'admin'])
     // Languages (settings sub-feature)
     Route::post('/languages', [LanguageController::class, 'store'])->name('languages.store');
     Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
+});
+
+Route::middleware(['web.auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {
+    Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/revenue', [InstructorRevenueController::class, 'index'])->name('revenue.index');
+
+    // Own courses
+    Route::get('/courses', [InstructorCourseController::class, 'index'])->name('courses.index');
+    Route::get('/courses/create', [InstructorCourseController::class, 'create'])->name('courses.create');
+    Route::post('/courses', [InstructorCourseController::class, 'store'])->name('courses.store');
+    Route::get('/courses/{course}/edit', [InstructorCourseController::class, 'edit'])->name('courses.edit');
+    Route::put('/courses/{course}', [InstructorCourseController::class, 'update'])->name('courses.update');
+    Route::delete('/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
+    Route::get('/courses/{course}/builder', [CourseController::class, 'builder'])->name('courses.builder');
+        /*
+        |--------------------------------------------------------------------------
+        | Course Sections
+        |--------------------------------------------------------------------------
+        */
+    // Course content builder (shared with admin, ownership-checked)
+    Route::post('/courses/{course}/sections', [SectionController::class, 'store'])->name('sections.store');
+    Route::post('/courses/{course}/sections/reorder', [SectionController::class, 'reorder'])->name('sections.reorder');
+    Route::put('/sections/{section}', [SectionController::class, 'update'])->name('sections.update');
+    Route::delete('/sections/{section}', [SectionController::class, 'destroy'])->name('sections.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lessons
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/sections/{section}/lessons', [
+            LessonController::class,
+            'store',
+        ])->name('lessons.store');
+
+        Route::post('/sections/{section}/lessons/reorder', [
+            LessonController::class,
+            'reorder',
+        ])->name('lessons.reorder');
+
+        Route::put('/lessons/{lesson}', [
+            LessonController::class,
+            'update',
+        ])->name('lessons.update');
+
+        Route::delete('/lessons/{lesson}', [
+            LessonController::class,
+            'destroy',
+        ])->name('lessons.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lesson Questions
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/lessons/{lesson}/questions', [
+            QuestionController::class,
+            'store',
+        ])->name('questions.store');
+
+        Route::put('/questions/{question}', [
+            QuestionController::class,
+            'update',
+        ])->name('questions.update');
+
+        Route::delete('/questions/{question}', [
+            QuestionController::class,
+            'destroy',
+        ])->name('questions.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/users', [
+            UserController::class,
+            'index',
+        ])->name('users.index');
+
+        Route::get('/users/create', [
+            UserController::class,
+            'create',
+        ])->name('users.create');
+
+        Route::post('/users', [
+            UserController::class,
+            'store',
+        ])->name('users.store');
+
+        Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+    Route::get('/users/{user}/edit', [
+            UserController::class,
+            'edit',
+        ])->name('users.edit');
+
+        Route::put('/users/{user}', [
+            UserController::class,
+            'update',
+        ])->name('users.update');
+
+        Route::patch('/users/{user}/status', [
+            UserController::class,
+            'updateStatus',
+        ])->name('users.update-status');
+
+        Route::delete('/users/{user}', [
+            UserController::class,
+            'destroy',
+        ])->name('users.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Enrollments
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/enrollments', [
+            EnrollmentController::class,
+            'index',
+        ])->name('enrollments.index');
+    Route::get('/enrollments/create', [EnrollmentController::class, 'create'])->name('enrollments.create');
+    Route::post('/enrollments', [EnrollmentController::class, 'store'])->name('enrollments.store');
+    Route::get('/enrollments/{enrollment}', [EnrollmentController::class, 'show'])->name('enrollments.show');
+    Route::get('/enrollments/{enrollment}/edit', [EnrollmentController::class, 'edit'])->name('enrollments.edit');
+    Route::put('/enrollments/{enrollment}', [EnrollmentController::class, 'update'])->name('enrollments.update');
+    Route::delete('/enrollments/{enrollment}', [EnrollmentController::class, 'destroy'])->name('enrollments.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Revenue
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/revenue/{tab?}', [
+            RevenueController::class,
+            'index',
+        ])->name('revenue.index');
+    Route::delete('/revenue/{payment}', [RevenueController::class, 'destroy'])->name('revenue.destroy');
+    Route::patch('/revenue/{payment}/mark-paid', [RevenueController::class, 'markPaid'])->name('revenue.mark-paid');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Settings
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/settings/{tab?}', [
+            SettingController::class,
+            'index',
+        ])->name('settings.index');
+
+        Route::post('/settings/{tab}', [
+            SettingController::class,
+            'update',
+        ])->name('settings.update');
+    
+    // Languages (settings sub-feature)
+    Route::post('/languages', [LanguageController::class, 'store'])->name('languages.store');
+    Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
+});
+
+Route::middleware(['web.auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {
+    Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/revenue', [InstructorRevenueController::class, 'index'])->name('revenue.index');
+
+    // Own courses
+    Route::get('/courses', [InstructorCourseController::class, 'index'])->name('courses.index');
+    Route::get('/courses/create', [InstructorCourseController::class, 'create'])->name('courses.create');
+    Route::post('/courses', [InstructorCourseController::class, 'store'])->name('courses.store');
+    Route::get('/courses/{course}/edit', [InstructorCourseController::class, 'edit'])->name('courses.edit');
+    Route::put('/courses/{course}', [InstructorCourseController::class, 'update'])->name('courses.update');
+    Route::delete('/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
+    Route::get('/courses/{course}/builder', [CourseController::class, 'builder'])->name('courses.builder');
+
+    // Course content builder (shared with admin, ownership-checked)
+    Route::post('/courses/{course}/sections', [SectionController::class, 'store'])->name('sections.store');
+    Route::post('/courses/{course}/sections/reorder', [SectionController::class, 'reorder'])->name('sections.reorder');
+    Route::put('/sections/{section}', [SectionController::class, 'update'])->name('sections.update');
+    Route::delete('/sections/{section}', [SectionController::class, 'destroy'])->name('sections.destroy');
+
+    Route::post('/sections/{section}/lessons', [LessonController::class, 'store'])->name('lessons.store');
+    Route::post('/sections/{section}/lessons/reorder', [LessonController::class, 'reorder'])->name('lessons.reorder');
+    Route::put('/lessons/{lesson}', [LessonController::class, 'update'])->name('lessons.update');
+    Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
+
+    Route::post('/lessons/{lesson}/questions', [QuestionController::class, 'store'])->name('questions.store');
+    Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
+    Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\AuthorizesCourseOwnership;
 use App\Concerns\GeneratesUniqueSlugs;
 use App\Models\Category;
 use App\Models\Course;
@@ -14,6 +15,7 @@ use Illuminate\View\View;
 
 class CourseController extends BaseAdminController
 {
+    use AuthorizesCourseOwnership;
     use GeneratesUniqueSlugs;
 
     public function __construct(
@@ -73,6 +75,8 @@ class CourseController extends BaseAdminController
             'search' => $request->get('search', ''),
             'pageTitle' => $title,
             'isPendingView' => $forcedStatus === 'pending',
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
             'stats' => [
                 'active' => $this->trends->forModel(Course::class, fn ($q) => $q->where('status', 'active')),
                 'pending' => $this->trends->forModel(Course::class, fn ($q) => $q->where('status', 'pending')),
@@ -88,6 +92,8 @@ class CourseController extends BaseAdminController
             'course' => new Course(),
             'categories' => Category::topLevel()->with('children')->orderBy('name')->get(),
             'instructors' => User::orderBy('name')->get(),
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
         ]);
     }
 
@@ -97,6 +103,7 @@ class CourseController extends BaseAdminController
             $validated = $this->validateCourse($request);
             $validated = $this->applyDerivedFields($request, $validated);
             $validated['slug'] = $this->uniqueSlug(Course::class, $validated['title']);
+            $validated['is_instructor'] = false;
 
             $course = Course::create($validated);
 
@@ -126,6 +133,8 @@ class CourseController extends BaseAdminController
             'course' => $course,
             'categories' => Category::topLevel()->with('children')->orderBy('name')->get(),
             'instructors' => User::orderBy('name')->get(),
+            'isAdmin' => true,
+            'routePrefix' => 'admin',
         ]);
     }
 
@@ -145,9 +154,13 @@ class CourseController extends BaseAdminController
 
     public function destroy(Course $course): RedirectResponse
     {
+        $this->authorizeCourseAccess($course);
+
+        $routePrefix = request()->routeIs('instructor.*') ? 'instructor' : 'admin';
+
         return $this->tryAction(function () use ($course) {
             $course->delete();
-        }, 'Course deleted.', 'admin.courses.index');
+        }, 'Course deleted.', "{$routePrefix}.courses.index");
     }
 
     public function approve(Course $course): RedirectResponse
@@ -182,10 +195,16 @@ class CourseController extends BaseAdminController
 
     public function builder(Course $course): View
     {
-        $course->load(['sections.lessons.questions']);
+        $this->authorizeCourseAccess($course);
+
+        $course->load(['sections.lessons.questions', 'instructor', 'category']);
+
+        $routePrefix = request()->routeIs('instructor.*') ? 'instructor' : 'admin';
 
         return view('admin.courses.builder', [
             'course' => $course,
+            'routePrefix' => $routePrefix,
+            'isAdmin' => $routePrefix === 'admin',
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\AuthorizesCourseOwnership;
 use App\Models\Course;
 use App\Models\Section;
 use Illuminate\Http\JsonResponse;
@@ -11,8 +12,12 @@ use Throwable;
 
 class SectionController extends BaseAdminController
 {
+    use AuthorizesCourseOwnership;
+
     public function store(Request $request, Course $course): RedirectResponse
     {
+        $this->authorizeCourseAccess($course);
+
         $validated = $request->validate(['title' => ['required', 'string', 'max:255']]);
 
         return $this->tryActionBack(function () use ($course, $validated) {
@@ -25,6 +30,8 @@ class SectionController extends BaseAdminController
 
     public function update(Request $request, Section $section): RedirectResponse
     {
+        $this->authorizeCourseAccess($section->course);
+
         $validated = $request->validate(['title' => ['required', 'string', 'max:255']]);
 
         return $this->tryActionBack(function () use ($section, $validated) {
@@ -34,6 +41,8 @@ class SectionController extends BaseAdminController
 
     public function destroy(Section $section): RedirectResponse
     {
+        $this->authorizeCourseAccess($section->course);
+
         return $this->tryActionBack(function () use ($section) {
             $section->delete();
         }, 'Section removed.');
@@ -41,6 +50,8 @@ class SectionController extends BaseAdminController
 
     public function reorder(Request $request, Course $course): JsonResponse
     {
+        $this->authorizeCourseAccess($course);
+
         $validated = $request->validate([
             'order' => ['required', 'array'],
             'order.*' => ['integer'],

@@ -14,12 +14,19 @@
         removeOption(i) { if (this.optionRows.length > 2) this.optionRows.splice(i, 1) },
     }">
         <div class="flex items-center gap-3 mb-6">
-            <a href="{{ route('admin.courses.index') }}" class="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-700">
+            <a href="{{ route($routePrefix.'.courses.index') }}" class="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-700">
                 <i class="fa-solid fa-arrow-left text-xs"></i>
             </a>
             <div class="flex-1">
                 <h2 class="text-2xl font-bold text-brand-950">{{ $course->title }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">Build out sections, lessons and quizzes for this course.</p>
+                <p class="text-sm text-slate-500 mt-0.5">
+                    @if ($isAdmin)
+                        by <span class="font-semibold text-slate-700">{{ $course->instructor->name ?? '—' }}</span>
+                        @if ($course->category) &middot; {{ $course->category->name }} @endif
+                    @else
+                        Build out sections, lessons and quizzes for this course.
+                    @endif
+                </p>
             </div>
             <x-admin.badge :color="$course->statusColor()">{{ ucfirst($course->status) }}</x-admin.badge>
             @if ($course->sections->count() > 1)
@@ -27,7 +34,7 @@
                     <i class="fa-solid fa-arrow-down-up-across-line text-xs"></i> Sort Sections
                 </button>
             @endif
-            <a href="{{ route('admin.courses.edit', $course) }}" class="rounded-lg bg-white border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:text-brand-700">Edit Details</a>
+            <a href="{{ route($routePrefix.'.courses.edit', $course) }}" class="rounded-lg bg-white border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:text-brand-700">Edit Details</a>
         </div>
 
         <div class="space-y-4">
@@ -48,7 +55,7 @@
                             <button @click="editSectionOpen = {{ $section->id }}" type="button" class="h-8 w-8 rounded-lg hover:bg-white text-slate-500 hover:text-brand-700 flex items-center justify-center">
                                 <i class="fa-solid fa-pen text-xs"></i>
                             </button>
-                            <form action="{{ route('admin.sections.destroy', $section) }}" method="POST" onsubmit="return confirm('Delete this section and all its lessons?');">
+                            <form action="{{ route($routePrefix.'.sections.destroy', $section) }}" method="POST" onsubmit="return confirm('Delete this section and all its lessons?');">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="h-8 w-8 rounded-lg hover:bg-white text-slate-500 hover:text-rose-600 flex items-center justify-center">
                                     <i class="fa-solid fa-trash text-xs"></i>
@@ -83,7 +90,7 @@
                                     <button @click="editLessonOpen = {{ $lesson->id }}" type="button" class="h-7 w-7 rounded text-slate-400 hover:text-brand-700 flex items-center justify-center">
                                         <i class="fa-solid fa-pen text-[11px]"></i>
                                     </button>
-                                    <form action="{{ route('admin.lessons.destroy', $lesson) }}" method="POST" onsubmit="return confirm('Delete this lesson?');">
+                                    <form action="{{ route($routePrefix.'.lessons.destroy', $lesson) }}" method="POST" onsubmit="return confirm('Delete this lesson?');">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="h-7 w-7 rounded text-slate-400 hover:text-rose-600 flex items-center justify-center">
                                             <i class="fa-solid fa-trash text-[11px]"></i>
@@ -145,7 +152,7 @@
                             @endif
 
                             {{-- Edit lesson modal --}}
-                            <x-admin.lesson-modal :lesson="$lesson" mode="edit" />
+                            <x-admin.lesson-modal :lesson="$lesson" mode="edit" :route-prefix="$routePrefix" />
 
                             {{-- Manage questions modal --}}
                             <div x-show="questionsOpen === {{ $lesson->id }}" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -168,7 +175,7 @@
                                                             <button type="button" @click="editingQuestion = true" class="text-slate-400 hover:text-brand-700">
                                                                 <i class="fa-solid fa-pen text-xs"></i>
                                                             </button>
-                                                            <form action="{{ route('admin.questions.destroy', $question) }}" method="POST" onsubmit="return confirm('Delete this question?');">
+                                                            <form action="{{ route($routePrefix.'.questions.destroy', $question) }}" method="POST" onsubmit="return confirm('Delete this question?');">
                                                                 @csrf @method('DELETE')
                                                                 <button type="submit" class="text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash text-xs"></i></button>
                                                             </form>
@@ -231,7 +238,7 @@
                                             </button>
                                         </div>
 
-                                        <form x-show="addQuestionOpen" action="{{ route('admin.questions.store', $lesson) }}" method="POST" class="rounded-xl border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+                                        <form x-show="addQuestionOpen" action="{{ route($routePrefix.'.questions.store', $lesson) }}" method="POST" class="rounded-xl border border-brand-200 bg-brand-50/40 p-4 space-y-3">
                                             @csrf
                                             <div>
                                                 <label class="block text-xs font-medium text-slate-700 mb-1">Question</label>
@@ -281,7 +288,7 @@
                     <div class="absolute inset-0 bg-slate-900/60" @click="editSectionOpen = null"></div>
                     <div class="relative w-full max-w-sm rounded-2xl bg-white shadow-xl p-6">
                         <h3 class="text-base font-semibold text-brand-950 mb-4">Edit Section</h3>
-                        <form action="{{ route('admin.sections.update', $section) }}" method="POST">
+                        <form action="{{ route($routePrefix.'.sections.update', $section) }}" method="POST">
                             @csrf @method('PUT')
                             <input type="text" name="title" required value="{{ $section->title }}"
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
@@ -294,13 +301,13 @@
                 </div>
 
                 {{-- Add lesson modal --}}
-                <x-admin.lesson-modal :section="$section" mode="add" />
+                <x-admin.lesson-modal :section="$section" mode="add" :route-prefix="$routePrefix" />
 
                 {{-- Sort lessons modal --}}
                 <x-admin.sort-modal
                     :items="$section->lessons"
                     heading="Sort Lessons — {{ $section->title }}"
-                    :endpoint="route('admin.lessons.reorder', $section)"
+                    :endpoint="route($routePrefix.'.lessons.reorder', $section)"
                     :show-expr="'sortLessonsOpen === '.$section->id"
                     close-expr="sortLessonsOpen = null"
                 />
@@ -323,7 +330,7 @@
             <div class="absolute inset-0 bg-slate-900/60" @click="addSectionOpen = false"></div>
             <div class="relative w-full max-w-sm rounded-2xl bg-white shadow-xl p-6">
                 <h3 class="text-base font-semibold text-brand-950 mb-4">Add Section</h3>
-                <form action="{{ route('admin.sections.store', $course) }}" method="POST">
+                <form action="{{ route($routePrefix.'.sections.store', $course) }}" method="POST">
                     @csrf
                     <input type="text" name="title" required placeholder="e.g. Getting Started"
                         class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
@@ -339,7 +346,7 @@
         <x-admin.sort-modal
             :items="$course->sections"
             heading="Sort Sections"
-            :endpoint="route('admin.sections.reorder', $course)"
+            :endpoint="route($routePrefix.'.sections.reorder', $course)"
             show-expr="sortSectionsOpen"
             close-expr="sortSectionsOpen = false"
         />
