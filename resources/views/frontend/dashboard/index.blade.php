@@ -1,9 +1,114 @@
 @extends('layouts.frontend')
+
 @section('title', 'My Dashboard')
+
 @section('content')
-<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="{{ route('home') }}">Home</a> / Dashboard</div><h1>Welcome back{{ !empty($user) && !empty($user->first_name) ? ', '.e($user->first_name) : '' }}!</h1><p>Your learning space: access your courses, track your progress and discover what to learn next.</p></div></section>
-<section class="section-pad"><div class="container"><div class="stat-grid"><div class="stat-box"><span class="muted">My courses</span><strong>{{ $enrolledCount ?? (isset($courses) ? $courses->count() : 0) }}</strong></div><div class="stat-box"><span class="muted">Learning goal</span><strong style="font-size:20px">Stay curious</strong></div><div class="stat-box"><span class="muted">Account</span><strong style="font-size:20px">Active</strong></div></div>
-<div class="content-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))"><a class="panel" href="{{ url('/my-courses') }}"><div style="font-size:30px">📚</div><h2>Continue learning</h2><p class="muted">Open your enrolled courses and continue your learning journey.</p><strong>View my courses →</strong></a><a class="panel" href="{{ url('/courses') }}"><div style="font-size:30px">🔎</div><h2>Discover courses</h2><p class="muted">Explore new subjects, skills and learning paths.</p><strong>Browse courses →</strong></a><a class="panel" href="{{ url('/cart') }}"><div style="font-size:30px">🛒</div><h2>My cart</h2><p class="muted">Review the courses you have selected.</p><strong>Open cart →</strong></a><a class="panel" href="{{ url('/profile') }}"><div style="font-size:30px">👤</div><h2>Account settings</h2><p class="muted">Review your profile details and account information.</p><strong>Manage profile →</strong></a></div>
-<div style="margin-top:28px"><h2>Recommended courses</h2>@if(isset($recommendedCourses) && $recommendedCourses->count())<div class="content-grid">@foreach($recommendedCourses as $course)@include('components.frontend.course-card',['course'=>$course])@endforeach</div>@else<p class="muted">New recommendations will appear here as the course library grows.</p><a class="btn btn-purple" href="{{ url('/courses') }}">Browse courses</a>@endif</div>
-</div></section>
+
+<section class="page-hero">
+    <div class="container">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+            <div>
+                <div class="breadcrumbs">
+                    <a href="{{ route('home') }}">Home</a> / Dashboard
+                </div>
+
+                <h1>
+                    Welcome back{{ !empty($user) && !empty($user->first_name) ? ', '.$user->first_name : '' }}!
+                </h1>
+
+                <p>Your learning space: access your courses, track your progress and discover what to learn next.</p>
+            </div>
+
+            <form method="POST" action="{{ route('logout') }}"
+                  onsubmit="return confirm('Are you sure you want to logout?');">
+                @csrf
+
+                <button type="submit"
+                        class="btn btn-light"
+                        style="background:#fff;border:1px solid #e9e3f0;color:#32105f;">
+                    Logout
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="section-pad">
+    <div class="container">
+
+        @if(session('success'))
+            <div class="notice notice-success">{{ session('success') }}</div>
+        @endif
+
+        @if(session('error'))
+            <div class="notice notice-error">{{ session('error') }}</div>
+        @endif
+
+        <div class="stat-grid">
+            <div class="stat-box">
+                <span class="muted">My courses</span>
+                <strong>{{ $enrolledCount ?? (isset($courses) ? $courses->count() : 0) }}</strong>
+            </div>
+
+            <div class="stat-box">
+                <span class="muted">Learning goal</span>
+                <strong style="font-size:20px">Stay curious</strong>
+            </div>
+
+            <div class="stat-box">
+                <span class="muted">Account</span>
+                <strong style="font-size:20px">Active</strong>
+            </div>
+        </div>
+
+        <div class="content-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+
+            <a class="panel" href="{{ url('/my-courses') }}">
+                <div style="font-size:30px">📚</div>
+                <h2>Continue learning</h2>
+                <p class="muted">Open your enrolled courses and continue your learning journey.</p>
+                <strong>View my courses →</strong>
+            </a>
+
+            <a class="panel" href="{{ url('/courses') }}">
+                <div style="font-size:30px">🔎</div>
+                <h2>Discover courses</h2>
+                <p class="muted">Explore new subjects, skills and learning paths.</p>
+                <strong>Browse courses →</strong>
+            </a>
+
+            <a class="panel" href="{{ url('/cart') }}">
+                <div style="font-size:30px">🛒</div>
+                <h2>My cart</h2>
+                <p class="muted">Review the courses you have selected.</p>
+                <strong>Open cart →</strong>
+            </a>
+
+            <a class="panel" href="{{ url('/profile') }}">
+                <div style="font-size:30px">👤</div>
+                <h2>Account settings</h2>
+                <p class="muted">Review your profile details and account information.</p>
+                <strong>Manage profile →</strong>
+            </a>
+
+        </div>
+
+        <div style="margin-top:28px">
+            <h2>Recommended courses</h2>
+
+            @if(isset($recommendedCourses) && $recommendedCourses->count())
+                <div class="content-grid">
+                    @foreach($recommendedCourses as $course)
+                        @include('components.frontend.course-card', ['course' => $course])
+                    @endforeach
+                </div>
+            @else
+                <p class="muted">New recommendations will appear here as the course library grows.</p>
+                <a class="btn btn-purple" href="{{ url('/courses') }}">Browse courses</a>
+            @endif
+        </div>
+
+    </div>
+</section>
+
 @endsection

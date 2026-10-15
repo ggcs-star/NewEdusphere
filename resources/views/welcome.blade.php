@@ -433,8 +433,8 @@
                                     @endif
                                 </div>
 
-                                <a href="{{ route('register') }}" class="btn btn-gold">
-                                    MORE {!! $icons['arrow'] !!}
+                                <a href="{{ route('courses.show', $course->id) }}" class="btn btn-gold">
+                                    VIEW DETAILS {!! $icons['arrow'] !!}
                                 </a>
                             </div>
                         </div>
