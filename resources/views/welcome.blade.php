@@ -771,7 +771,7 @@
                             @elseif ($category->icon)
                                 <span>{{ $category->icon }}</span>
                             @else
-                                {!! $icons['book'] !!}
+                                {!! $icons['cap'] !!}
                             @endif
                         </div>
 
