@@ -204,6 +204,7 @@
 
         .login-link { font-size: 12px; font-weight: 700; }
         .login-link:hover { color: var(--purple); }
+        .nav-actions .btn-gold:active { background: var(--gold-dark); box-shadow: inset 0 0 0 2px var(--purple-dark); }
         .nav-divider { color: #d7d0e0; }
 
         .menu-toggle {
@@ -1138,8 +1139,7 @@
                 <a href="{{ url('/dashboard') }}" class="login-link">My dashboard</a>
                 <a href="{{ url('/cart') }}" class="btn btn-gold">My cart</a>
             @else
-                <a href="{{ route('login') }}" class="login-link">◉ Login</a>
-                <span class="nav-divider">|</span>
+                <a href="{{ route('login') }}" class="btn btn-gold">Login</a>
                 <a href="{{ route('register') }}" class="btn btn-gold">Register</a>
             @endif
 
