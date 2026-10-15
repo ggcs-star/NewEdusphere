@@ -16,6 +16,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\CheckoutController;
 use App\Http\Controllers\Frontend\MyCoursesController;
+use App\Http\Controllers\HomeController;
 use App\Models\Category;
 use App\Models\Course;
 use Illuminate\Http\Request;
@@ -31,23 +32,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    $categories = Category::query()
-        ->topLevel()
-        ->withCount('children')
-        ->orderBy('name')
-        ->take(8)
-        ->get();
-
-    $featuredCourses = Course::query()
-        ->where('status', 'active')
-        ->with(['instructor', 'category'])
-        ->latest()
-        ->take(24)
-        ->get();
-
-    return view('welcome', compact('categories', 'featuredCourses'));
-})->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 /*
 |--------------------------------------------------------------------------
