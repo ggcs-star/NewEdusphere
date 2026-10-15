@@ -43,7 +43,7 @@ class Category extends Model
     public function thumbnailUrl(): string
     {
         return $this->thumbnail
-            ? asset('storage/categories/'.$this->thumbnail)
+            ? asset('storage/'.$this->thumbnail)
             : asset('images/category-placeholder.png');
     }
 }

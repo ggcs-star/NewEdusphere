@@ -40,9 +40,10 @@ Route::get('/', function () {
         ->get();
 
     $featuredCourses = Course::query()
+        ->where('status', 'active')
         ->with(['instructor', 'category'])
         ->latest()
-        ->take(8)
+        ->take(24)
         ->get();
 
     return view('welcome', compact('categories', 'featuredCourses'));

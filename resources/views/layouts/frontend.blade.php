@@ -366,15 +366,12 @@
         /* Featured courses */
 
         .featured-section {
-            color: white;
-            background:
-                radial-gradient(ellipse at 50% 0%,rgba(232, 234, 237, 0.24),transparent 60%),
-                var(--purple-dark);
+            background: #fff;
         }
 
-        .featured-section .section-title { color: white; }
-        .featured-section .section-kicker { color: var(--gold); }
-        .featured-section .section-description { color: #af8ae3; }
+        .featured-section .section-title { color: var(--purple); }
+        .featured-section .section-kicker { color: var(--purple); }
+        .featured-section .section-description { color: var(--muted); }
 
         .course-grid {
             display: grid;
@@ -428,7 +425,7 @@
 
         .course-category {
             margin-bottom: 7px;
-            color: var(--gold);
+            color: var(--purple);
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
@@ -438,7 +435,7 @@
         .course-title {
             min-height: 27px;
             margin-bottom: 10px;
-            color: var(--gold);
+            color: var(--purple);
             font-size: 19px;
             font-weight: 700;
             overflow-wrap: anywhere;
@@ -447,7 +444,7 @@
         .course-description {
             min-height: 48px;
             margin-bottom: 16px;
-            color: #0d0c0e;
+            color: var(--muted);
             font-size: 13px;
             line-height: 1.8;
         }
@@ -458,15 +455,15 @@
             flex-wrap: wrap;
             gap: 10px;
             margin-bottom: 15px;
-            color: #7147ac;
+            color: var(--muted);
             font-size: 11px;
         }
 
-        .course-price { color: white; font-size: 16px; font-weight: 800; }
+        .course-price { color: var(--purple); font-size: 16px; font-weight: 800; }
 
         .course-old-price {
             margin-left: 5px;
-            color: #c3b3d9;
+            color: #9b96a8;
             font-size: 11px;
             font-weight: 400;
             text-decoration: line-through;
@@ -478,7 +475,7 @@
             justify-content: space-between;
             gap: 10px;
             padding-top: 14px;
-            border-top: 1px solid rgba(255,255,255,.14);
+            border-top: 1px solid var(--border);
         }
 
         .course-actions .btn {
@@ -491,12 +488,12 @@
         .empty-state {
             grid-column: 1/-1;
             padding: 40px 20px;
-            border: 1px dashed rgba(255,255,255,.25);
-            color: #190d27;
+            border: 1px dashed var(--border);
+            color: var(--muted);
             text-align: center;
         }
 
-        .empty-state h3 { margin-bottom: 8px; color: var(--gold); }
+        .empty-state h3 { margin-bottom: 8px; color: var(--purple); }
         .empty-state p { margin-bottom: 0; font-size: 13px; }
 
         /* Learning goals — merged section */
@@ -1128,12 +1125,12 @@
         </a>
 
         <nav class="nav-links" id="mainNavigation" aria-label="Main navigation">
-            <a href="{{ route('home') }}" class="active">Home</a>
-            <a href="{{ url('/courses') }}">Courses</a>
-            <a href="{{ url('/about') }}">About Us</a>
-            <a href="{{ url('/categories') }}">Categories</a>
-            <a href="{{ url('/my-courses') }}">My Learning</a>
-            <a href="{{ url('/contact') }}">Contact Us</a>
+            <a href="{{ route('home') }}" class="{{ request()->is('/') ? 'active' : '' }}">Home</a>
+            <a href="{{ url('/courses') }}" class="{{ request()->is('courses*') ? 'active' : '' }}">Courses</a>
+            <a href="{{ url('/about') }}" class="{{ request()->is('about*') ? 'active' : '' }}">About Us</a>
+            <a href="{{ url('/categories') }}" class="{{ request()->is('categories*') ? 'active' : '' }}">Categories</a>
+            <a href="{{ url('/my-courses') }}" class="{{ request()->is('my-courses*') ? 'active' : '' }}">My Learning</a>
+            <a href="{{ url('/contact') }}" class="{{ request()->is('contact*') ? 'active' : '' }}">Contact Us</a>
         </nav>
 
         <div class="nav-actions">
