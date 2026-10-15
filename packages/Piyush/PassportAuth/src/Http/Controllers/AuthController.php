@@ -130,8 +130,16 @@ class AuthController extends Controller
         return $social->redirect($provider);
     }
 
-    public function socialCallback(string $provider, SocialAuthService $social): JsonResponse
-    {
-        return AuthResponse::success('Social login successful.', $social->callback($provider));
-    }
+public function socialCallback(
+    string $provider,
+    SocialAuthService $social
+) {
+    $result = $social->callback($provider);
+
+    // Redirect browser to the frontend after successful login.
+    return redirect()->to(
+        config('app.frontend_url', url('/dashboard'))
+    );
+}
+
 }
