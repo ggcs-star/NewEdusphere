@@ -162,11 +162,27 @@
                     <i class="fa-solid fa-bars"></i>
                 </button>
 
-                <div class="flex items-center gap-4 ml-auto">
-                    <button type="button" class="relative h-10 w-10 flex items-center justify-center rounded-full hover:bg-brand-50 text-brand-700 transition">
-                        <i class="fa-regular fa-bell text-lg"></i>
-                        <span class="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-accent-500 ring-2 ring-white"></span>
-                    </button>
+           
+<div class="flex items-center gap-4 ml-auto">
+
+    {{-- Visit Public Website --}}
+    <a href="{{ route('home') }}"
+       target="_blank"
+       rel="noopener noreferrer"
+       class="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        <span class="hidden sm:inline">Visit Website</span>
+        <span class="sm:hidden">Website</span>
+    </a>
+
+    {{-- Notifications --}}
+    <button type="button"
+        class="relative h-10 w-10 flex items-center justify-center rounded-full hover:bg-brand-50 text-brand-700 transition">
+        <i class="fa-regular fa-bell text-lg"></i>
+        <span class="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-accent-500 ring-2 ring-white"></span>
+    </button>
+
+
 
                     <div class="flex items-center gap-2.5 pl-4 border-l border-slate-200">
                         <div class="h-9 w-9 rounded-full bg-brand-900 text-white flex items-center justify-center font-semibold text-sm">

@@ -221,7 +221,7 @@ Route::middleware('web.auth')->group(function () {
         $userId = $user?->id;
 
         $enrolledIds = $userId
-            ? DB::table('enrol')
+            ? DB::table('enrollments')
                 ->where('user_id', $userId)
                 ->pluck('course_id')
             : collect();
@@ -293,10 +293,10 @@ Route::middleware('web.auth')->group(function () {
 
         abort_unless($user, 403);
 
-        $payments = DB::table('payment')
-            ->where('user_id', $user->id)
-            ->orderByDesc('date_added')
-            ->get();
+   $payments = DB::table('payments')
+    ->where('user_id', $user->id)
+->orderByDesc('id')
+    ->get();
 
         return view(
             'frontend.purchase-history.index',
