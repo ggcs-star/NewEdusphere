@@ -79,8 +79,8 @@
                                 @endif
                             </div>
 
-                            <a href="{{ route('register') }}" class="btn btn-gold">
-                                MORE <x-icon name="arrow" />
+                            <a href="{{ route('courses.show', $course->id) }}" class="btn btn-gold">
+                                VIEW DETAILS <x-icon name="arrow" />
                             </a>
                         </div>
                     </div>
