@@ -58,6 +58,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         :root {
@@ -264,6 +265,7 @@
 
         .login-link { font-size: 12px; font-weight: 700; white-space: nowrap; }
         .login-link:hover { color: var(--purple); }
+        .nav-actions .btn-gold:active { background: var(--gold-dark); box-shadow: inset 0 0 0 2px var(--purple-dark); }
         .nav-divider { color: #d7d0e0; }
 
         .menu-toggle {
@@ -378,13 +380,12 @@
 
         /* Featured courses (legacy home blocks, kept for other pages) */
         .featured-section {
-            color: white;
-            background: radial-gradient(ellipse at 50% 0%,rgba(232,234,237,.24),transparent 60%), var(--purple-dark);
+            background: #fff;
         }
 
-        .featured-section .section-title { color: white; }
-        .featured-section .section-kicker { color: var(--gold); }
-        .featured-section .section-description { color: #af8ae3; }
+        .featured-section .section-title { color: var(--purple); }
+        .featured-section .section-kicker { color: var(--purple); }
+        .featured-section .section-description { color: var(--muted); }
 
         .course-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 25px; }
 
@@ -416,17 +417,51 @@
 
         .course-content { padding: 16px 20px 21px; }
 
-        .course-category { margin-bottom: 7px; color: var(--gold); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; }
+        .course-category {
+            margin-bottom: 7px;
+            color: var(--purple);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+        }
 
-        .course-title { min-height: 27px; margin-bottom: 10px; color: var(--gold); font-size: 19px; font-weight: 700; overflow-wrap: anywhere; }
+        .course-title {
+            min-height: 27px;
+            margin-bottom: 10px;
+            color: var(--purple);
+            font-size: 19px;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
 
-        .course-description { min-height: 48px; margin-bottom: 16px; color: #0d0c0e; font-size: 13px; line-height: 1.8; }
+        .course-description {
+            min-height: 48px;
+            margin-bottom: 16px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.8;
+        }
 
-        .course-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; color: #7147ac; font-size: 11px; }
+        .course-meta {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+            color: var(--muted);
+            font-size: 11px;
+        }
 
-        .course-price { color: white; font-size: 16px; font-weight: 800; }
+        .course-price { color: var(--purple); font-size: 16px; font-weight: 800; }
 
-        .course-old-price { margin-left: 5px; color: #c3b3d9; font-size: 11px; font-weight: 400; text-decoration: line-through; }
+        .course-old-price {
+            margin-left: 5px;
+            color: #9b96a8;
+            font-size: 11px;
+            font-weight: 400;
+            text-decoration: line-through;
+        }
 
         .course-actions {
             display: flex;
@@ -435,10 +470,23 @@
             flex-wrap: wrap;
             gap: 10px;
             padding-top: 14px;
-            border-top: 1px solid rgba(255,255,255,.14);
+            border-top: 1px solid var(--border);
         }
 
-        .course-actions .btn { min-height: 37px; padding: 9px 17px; font-size: 11px; letter-spacing: .5px; }
+        .course-actions .btn {
+            min-height: 37px;
+            padding: 9px 17px;
+            font-size: 11px;
+            letter-spacing: .5px;
+        }
+
+        .empty-state {
+            grid-column: 1/-1;
+            padding: 40px 20px;
+            border: 1px dashed var(--border);
+            color: var(--muted);
+            text-align: center;
+        }
 
         .empty-state h3 { margin-bottom: 8px; color: var(--purple); }
         .empty-state p { margin-bottom: 0; font-size: 13px; }
@@ -1041,15 +1089,12 @@
         </a>
 
         <nav class="nav-links" id="mainNavigation" aria-label="Main navigation">
-            @foreach ($navItems as $item)
-                <a href="{{ $item['url'] }}" class="{{ $item['active'] ? 'active' : '' }}" @if ($item['active']) aria-current="page" @endif>{{ $item['label'] }}</a>
-            @endforeach
-
-            @unless ($isUserLoggedIn && $headerUser)
-                {{-- Sirf bahut chhote phones par dikhte hain --}}
-                <a href="{{ route('login') }}" class="nav-auth-mobile">Login</a>
-                <a href="{{ route('register') }}" class="nav-auth-mobile register">Register</a>
-            @endunless
+            <a href="{{ route('home') }}" class="{{ request()->is('/') ? 'active' : '' }}">Home</a>
+            <a href="{{ url('/courses') }}" class="{{ request()->is('courses*') ? 'active' : '' }}">Courses</a>
+            <a href="{{ url('/about') }}" class="{{ request()->is('about*') ? 'active' : '' }}">About Us</a>
+            <a href="{{ url('/categories') }}" class="{{ request()->is('categories*') ? 'active' : '' }}">Categories</a>
+            <a href="{{ url('/my-courses') }}" class="{{ request()->is('my-courses*') ? 'active' : '' }}">My Learning</a>
+            <a href="{{ url('/contact') }}" class="{{ request()->is('contact*') ? 'active' : '' }}">Contact Us</a>
         </nav>
 
         <div class="nav-actions">
