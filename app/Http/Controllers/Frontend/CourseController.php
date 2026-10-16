@@ -52,7 +52,28 @@ class CourseController extends Controller
 
         return view('frontend.courses.show', compact('course', 'relatedCourses'));
     }
+public function learn(string $slug, int $lesson): View
+{
+    $course = Course::with([
+        'instructor',
+        'category',
+        'sections.lessons',
+    ])
+        ->where('status', 'active')
+        ->where('slug', $slug)
+        ->firstOrFail();
 
+    $currentLesson = $course->sections
+        ->flatMap(fn ($section) => $section->lessons)
+        ->firstWhere('id', $lesson);
+
+    abort_if(!$currentLesson, 404);
+
+    return view('frontend.courses.learn', [
+        'course' => $course,
+        'currentLesson' => $currentLesson,
+    ]);
+}
     public function categories(): View
     {
         $categories = Category::where('status', true)->withCount('children')
