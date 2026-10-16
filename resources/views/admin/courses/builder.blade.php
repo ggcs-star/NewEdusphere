@@ -6,12 +6,22 @@
         addLessonOpen: null,
         editLessonOpen: null,
         sortLessonsOpen: null,
-        questionsOpen: null,
+        questionsOpen: {{ session('reopen_quiz') ? (int) session('reopen_quiz') : 'null' }},
         previewOpen: null,
-        addQuestionOpen: false,
+        addQuestionOpen: {{ session('reopen_quiz') ? 'true' : 'false' }},
         optionRows: ['', ''],
+        questionType: 'single_choice',
+        correctAnswers: [],
         addOption() { this.optionRows.push('') },
         removeOption(i) { if (this.optionRows.length > 2) this.optionRows.splice(i, 1) },
+        toggleCorrect(i) {
+            if (this.questionType === 'single_choice') {
+                this.correctAnswers = [i];
+                return;
+            }
+            const idx = this.correctAnswers.indexOf(i);
+            if (idx === -1) { this.correctAnswers.push(i) } else { this.correctAnswers.splice(idx, 1) }
+        },
     }">
         <div class="flex items-center gap-3 mb-6">
             <a href="{{ route($routePrefix.'.courses.index') }}" class="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-700">
@@ -103,7 +113,7 @@
                             @if ($lesson->lesson_type !== 'quiz')
                                 <div x-show="previewOpen === {{ $lesson->id }}" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                                     <div class="absolute inset-0 bg-slate-900/60" @click="previewOpen = null"></div>
-                                    <div class="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+                                    <div class="relative w-full max-w-2xl max-h-[95vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
                                         <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4 sticky top-0 bg-white">
                                             <div class="min-w-0">
                                                 <h3 class="text-base font-semibold text-brand-950 truncate">{{ $lesson->title }}</h3>
@@ -134,10 +144,19 @@
                                                 @endif
                                             @elseif ($lesson->lesson_type === 'document')
                                                 @if ($lesson->attachment)
-                                                    <a href="{{ Storage::url($lesson->attachment) }}" target="_blank" rel="noopener"
-                                                        class="inline-flex items-center gap-2 rounded-lg bg-brand-50 text-brand-700 px-4 py-2.5 text-sm font-semibold hover:bg-brand-100 mb-4">
-                                                        <i class="fa-solid fa-file-arrow-down text-xs"></i> Open Attachment
-                                                    </a>
+                                                    @php $attachmentExt = strtolower(pathinfo($lesson->attachment, PATHINFO_EXTENSION)); @endphp
+                                                    @if ($attachmentExt === 'pdf')
+                                                        <iframe src="{{ Storage::url($lesson->attachment) }}" class="w-full h-[85vh] rounded-xl border border-slate-200 mb-3"></iframe>
+                                                        <a href="{{ Storage::url($lesson->attachment) }}" target="_blank" rel="noopener"
+                                                            class="inline-flex items-center gap-2 text-xs font-medium text-brand-700 hover:underline mb-4">
+                                                            <i class="fa-solid fa-up-right-from-square text-xs"></i> Open in new tab
+                                                        </a>
+                                                    @else
+                                                        <a href="{{ Storage::url($lesson->attachment) }}" target="_blank" rel="noopener"
+                                                            class="inline-flex items-center gap-2 rounded-lg bg-brand-50 text-brand-700 px-4 py-2.5 text-sm font-semibold hover:bg-brand-100 mb-4">
+                                                            <i class="fa-solid fa-file-arrow-down text-xs"></i> Open Attachment
+                                                        </a>
+                                                    @endif
                                                 @endif
 
                                                 @if ($lesson->summary)
@@ -159,7 +178,12 @@
                                 <div class="absolute inset-0 bg-slate-900/60" @click="questionsOpen = null; addQuestionOpen = false"></div>
                                 <div class="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
                                     <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4 sticky top-0 bg-white">
-                                        <h3 class="text-base font-semibold text-brand-950">Quiz Questions — {{ $lesson->title }}</h3>
+                                        <div>
+                                            <h3 class="text-base font-semibold text-brand-950">Quiz Questions — {{ $lesson->title }}</h3>
+                                            @if ($lesson->questions->isNotEmpty())
+                                                <p class="text-xs text-slate-400 mt-0.5">Total: {{ $lesson->total_score }} points across {{ $lesson->questions->count() }} question{{ $lesson->questions->count() === 1 ? '' : 's' }}</p>
+                                            @endif
+                                        </div>
                                         <button type="button" @click="questionsOpen = null; addQuestionOpen = false" class="text-slate-400 hover:text-slate-600">
                                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
@@ -167,10 +191,26 @@
 
                                     <div class="p-6 space-y-3">
                                         @forelse ($lesson->questions as $question)
-                                            <div class="rounded-xl border border-slate-200 p-4" x-data="{ editingQuestion: false, rows: @js($question->options) }">
+                                            <div class="rounded-xl border border-slate-200 p-4" x-data="{
+                                                editingQuestion: false,
+                                                rows: @js($question->options),
+                                                questionType: @js($question->type),
+                                                correctAnswers: @js($question->correct_answers),
+                                                toggleCorrect(i) {
+                                                    if (this.questionType === 'single_choice') {
+                                                        this.correctAnswers = [i];
+                                                        return;
+                                                    }
+                                                    const idx = this.correctAnswers.indexOf(i);
+                                                    if (idx === -1) { this.correctAnswers.push(i) } else { this.correctAnswers.splice(idx, 1) }
+                                                },
+                                            }">
                                                 <div x-show="!editingQuestion">
                                                     <div class="flex items-start justify-between gap-2">
-                                                        <p class="text-sm font-medium text-slate-800">{{ $loop->iteration }}. {{ $question->title }}</p>
+                                                        <p class="text-sm font-medium text-slate-800">
+                                                            {{ $loop->iteration }}. {{ $question->title }}
+                                                            <span class="text-xs font-normal text-slate-400">({{ $question->points }} {{ $question->points === 1 ? 'point' : 'points' }})</span>
+                                                        </p>
                                                         <div class="flex items-center gap-2 flex-shrink-0">
                                                             <button type="button" @click="editingQuestion = true" class="text-slate-400 hover:text-brand-700">
                                                                 <i class="fa-solid fa-pen text-xs"></i>
@@ -191,27 +231,34 @@
                                                     </ul>
                                                 </div>
 
-                                                <form x-show="editingQuestion" x-cloak action="{{ route('admin.questions.update', $question) }}" method="POST" class="space-y-3">
+                                                <form x-show="editingQuestion" x-cloak x-init="$watch('questionType', t => { if (t === 'single_choice' && correctAnswers.length > 1) correctAnswers = [correctAnswers[correctAnswers.length - 1]] })" action="{{ route('admin.questions.update', $question) }}" method="POST" class="space-y-3">
                                                     @csrf @method('PUT')
                                                     <div>
                                                         <label class="block text-xs font-medium text-slate-700 mb-1">Question</label>
                                                         <input type="text" name="title" required value="{{ $question->title }}"
                                                             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                                     </div>
-                                                    <div>
-                                                        <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
-                                                        <x-admin.searchable-select
-                                                            name="type"
-                                                            :options="['single_choice' => 'Single choice', 'multiple_choice' => 'Multiple choice']"
-                                                            :selected="$question->type"
-                                                        />
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                                                            <x-admin.searchable-select
+                                                                name="type"
+                                                                :options="['single_choice' => 'Single choice', 'multiple_choice' => 'Multiple choice']"
+                                                                bind-to="questionType"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-slate-700 mb-1">Points</label>
+                                                            <input type="number" name="points" min="1" max="100" required value="{{ old('points', $question->points) }}"
+                                                                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <label class="block text-xs font-medium text-slate-700 mb-1">Options <span class="text-slate-400">(check the correct answer(s))</span></label>
+                                                        <label class="block text-xs font-medium text-slate-700 mb-1">Options <span class="text-slate-400" x-text="questionType === 'single_choice' ? '(select the correct answer)' : '(check the correct answer(s))'"></span></label>
                                                         <div class="space-y-2">
                                                             <template x-for="(row, i) in rows" :key="i">
                                                                 <div class="flex items-center gap-2">
-                                                                    <input type="checkbox" name="correct[]" :value="i" :checked="@js($question->correct_answers).includes(i)" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                                                    <input :type="questionType === 'single_choice' ? 'radio' : 'checkbox'" name="correct[]" :value="i" :checked="correctAnswers.includes(i)" @change="toggleCorrect(i)" :class="questionType === 'single_choice' ? 'rounded-full' : 'rounded'" class="border-slate-300 text-brand-600 focus:ring-brand-500">
                                                                     <input type="text" name="options[]" x-model="rows[i]" required placeholder="Option text"
                                                                         class="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                                                     <button type="button" @click="if (rows.length > 2) rows.splice(i, 1)" class="text-slate-400 hover:text-rose-600"><i class="fa-solid fa-xmark text-xs"></i></button>
@@ -232,31 +279,39 @@
 
                                         {{-- Add question form --}}
                                         <div x-show="!addQuestionOpen">
-                                            <button @click="addQuestionOpen = true; optionRows = ['', '']" type="button"
+                                            <button @click="addQuestionOpen = true; optionRows = ['', '']; questionType = 'single_choice'; correctAnswers = []" type="button"
                                                 class="w-full rounded-xl border-2 border-dashed border-brand-200 py-3 text-sm font-medium text-brand-600 hover:bg-brand-50 transition">
                                                 <i class="fa-solid fa-plus mr-1"></i> Add Question
                                             </button>
                                         </div>
 
-                                        <form x-show="addQuestionOpen" action="{{ route($routePrefix.'.questions.store', $lesson) }}" method="POST" class="rounded-xl border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+                                        <form x-show="addQuestionOpen" x-init="$watch('questionType', t => { if (t === 'single_choice' && correctAnswers.length > 1) correctAnswers = [correctAnswers[correctAnswers.length - 1]] })" action="{{ route($routePrefix.'.questions.store', $lesson) }}" method="POST" class="rounded-xl border border-brand-200 bg-brand-50/40 p-4 space-y-3">
                                             @csrf
                                             <div>
                                                 <label class="block text-xs font-medium text-slate-700 mb-1">Question</label>
                                                 <input type="text" name="title" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                             </div>
-                                            <div>
-                                                <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
-                                                <x-admin.searchable-select
-                                                    name="type"
-                                                    :options="['single_choice' => 'Single choice', 'multiple_choice' => 'Multiple choice']"
-                                                />
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                                                    <x-admin.searchable-select
+                                                        name="type"
+                                                        :options="['single_choice' => 'Single choice', 'multiple_choice' => 'Multiple choice']"
+                                                        bind-to="questionType"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-slate-700 mb-1">Points</label>
+                                                    <input type="number" name="points" min="1" max="100" required value="1"
+                                                        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                                                </div>
                                             </div>
                                             <div>
-                                                <label class="block text-xs font-medium text-slate-700 mb-1">Options <span class="text-slate-400">(check the correct answer(s))</span></label>
+                                                <label class="block text-xs font-medium text-slate-700 mb-1">Options <span class="text-slate-400" x-text="questionType === 'single_choice' ? '(select the correct answer)' : '(check the correct answer(s))'"></span></label>
                                                 <div class="space-y-2">
                                                     <template x-for="(row, i) in optionRows" :key="i">
                                                         <div class="flex items-center gap-2">
-                                                            <input type="checkbox" name="correct[]" :value="i" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                                            <input :type="questionType === 'single_choice' ? 'radio' : 'checkbox'" name="correct[]" :value="i" :checked="correctAnswers.includes(i)" @change="toggleCorrect(i)" :class="questionType === 'single_choice' ? 'rounded-full' : 'rounded'" class="border-slate-300 text-brand-600 focus:ring-brand-500">
                                                             <input type="text" name="options[]" x-model="optionRows[i]" required placeholder="Option text"
                                                                 class="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                                             <button type="button" @click="removeOption(i)" class="text-slate-400 hover:text-rose-600"><i class="fa-solid fa-xmark text-xs"></i></button>

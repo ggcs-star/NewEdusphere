@@ -27,6 +27,8 @@
         <x-admin.stat-card icon="fa-user-graduate" color="violet" :count="$stats['students']" label="Students Enrolled" :change="0" direction="flat" />
     </div>
 
+    <x-admin.revenue-analytics :analytics="$analytics" period-route="instructor.dashboard" :is-admin="false" />
+
     {{-- Recent courses --}}
     <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <div class="flex items-center justify-between mb-4">

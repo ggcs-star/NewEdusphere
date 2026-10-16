@@ -5,6 +5,10 @@ import Alpine from 'alpinejs';
 window.Alpine = Alpine;
 Alpine.start();
 
+import Chart from 'chart.js/auto';
+
+window.Chart = Chart;
+
 import tinymce from 'tinymce/tinymce';
 import 'tinymce/models/dom/model';
 import 'tinymce/themes/silver';

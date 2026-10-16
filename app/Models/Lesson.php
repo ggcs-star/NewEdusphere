@@ -13,7 +13,7 @@ class Lesson extends Model
     use HasFactory;
 
     protected $fillable = [
-        'course_id', 'section_id', 'title', 'lesson_type',
+        'course_id', 'section_id', 'title', 'lesson_type', 'total_score',
         'video_type', 'video_url', 'duration', 'attachment', 'summary', 'order',
     ];
 
@@ -30,6 +30,16 @@ class Lesson extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(Question::class)->orderBy('order');
+    }
+
+    /**
+     * Recomputes and persists total_score from the current questions —
+     * call this after any question is added, edited, or removed so the
+     * stored total never drifts out of sync.
+     */
+    public function recalculateTotalScore(): void
+    {
+        $this->update(['total_score' => $this->questions()->sum('points')]);
     }
 
     /**
