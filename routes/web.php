@@ -22,6 +22,8 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Instructor\CourseController as InstructorCourseController;
 use App\Http\Controllers\Instructor\DashboardController as InstructorDashboardController;
 use App\Http\Controllers\Instructor\RevenueController as InstructorRevenueController;
+use App\Http\Controllers\Frontend\CourseController as FrontendCourseController;
+
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -98,7 +100,10 @@ Route::get('/courses/{course}', function (Course $course) {
 
     return view('frontend.courses.show', compact('course'));
 })->whereNumber('course')->name('courses.show');
-
+Route::get('/home/course/{slug}/{id}', [
+    FrontendCourseController::class,
+    'show',
+])->whereNumber('id')->name('home.course.show');
 Route::get('/categories', function () {
     $categories = Category::query()
         ->withCount('children')

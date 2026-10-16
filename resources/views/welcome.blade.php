@@ -595,9 +595,12 @@
                                     @endif
                                 </div>
 
-                                <a href="{{ route('courses.show', $course->id) }}" class="btn btn-gold">
-                                    VIEW DETAILS {!! $icons['arrow'] !!}
-                                </a>
+                               <a href="{{ route('home.course.show', [
+    'slug' => \Illuminate\Support\Str::slug($course->title),
+    'id' => $course->id
+]) }}" class="btn btn-gold">
+    VIEW DETAILS {!! $icons['arrow'] !!}
+</a>
                             </div>
                         </div>
                     </article>
