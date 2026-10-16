@@ -19,15 +19,7 @@
 @forelse(($categories ?? collect()) as $category)
 <a class="info-card" style="padding:26px;display:block" href="{{ url('/courses?category='.$category->id) }}">
     <div class="category-page-icon">
-        @if ($category->thumbnail)
-            <img src="{{ $category->thumbnailUrl() }}" alt="{{ $category->name }}" loading="lazy">
-        @elseif ($category->icon && \Illuminate\Support\Str::contains($category->icon, ['fa-', 'bi-']))
-            <i class="{{ $category->icon }}" aria-hidden="true"></i>
-        @elseif ($category->icon)
-            <span>{{ $category->icon }}</span>
-        @else
-            <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
-        @endif
+        <x-category-icon :category="$category" />
     </div>
     <h3 style="margin:0 0 6px">{{ $category->name }}</h3>
     <p class="muted">{{ \Illuminate\Support\Str::limit($category->description ?? 'Explore courses and build skills in this subject.',100) }}</p>

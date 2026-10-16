@@ -1232,8 +1232,7 @@
                 </div>
             @else
                 <div class="guest-actions">
-                    <a href="{{ route('login') }}" class="login-link">Login</a>
-                    <span class="nav-divider">|</span>
+                    <a href="{{ route('login') }}" class="btn btn-gold">Login</a>
                     <a href="{{ route('register') }}" class="btn btn-gold">Register</a>
                 </div>
             @endif
