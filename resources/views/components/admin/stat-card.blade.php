@@ -1,4 +1,4 @@
-@props(['icon', 'color', 'count', 'label', 'change' => 0, 'direction' => 'flat'])
+@props(['icon', 'color', 'count', 'label', 'change' => 0, 'direction' => 'flat', 'changeLabel' => 'from last month'])
 
 @php
 $palette = [
@@ -23,11 +23,11 @@ $p = $palette[$color] ?? $palette['violet'];
     <div class="relative mt-3 flex items-center justify-between">
         @if ($direction === 'up')
             <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
-                <i class="fa-solid fa-arrow-trend-up"></i> +{{ $change }}% from last month
+                <i class="fa-solid fa-arrow-trend-up"></i> +{{ $change }}% {{ $changeLabel }}
             </span>
         @elseif ($direction === 'down')
             <span class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                <i class="fa-solid fa-arrow-trend-down"></i> {{ $change }}% from last month
+                <i class="fa-solid fa-arrow-trend-down"></i> {{ $change }}% {{ $changeLabel }}
             </span>
         @else
             <span class="inline-flex items-center gap-1 text-xs font-medium text-slate-400">

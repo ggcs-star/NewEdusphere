@@ -22,11 +22,14 @@ class QuestionController extends BaseAdminController
             $lesson->questions()->create([
                 'title' => $validated['title'],
                 'type' => $validated['type'],
+                'points' => $validated['points'],
                 'options' => array_values($validated['options']),
                 'correct_answers' => $validated['correct'],
                 'order' => $lesson->questions()->max('order') + 1,
             ]);
-        }, 'Question added.');
+
+            $lesson->recalculateTotalScore();
+        }, 'Question added.')->with('reopen_quiz', $lesson->id);
     }
 
     public function update(Request $request, Question $question): RedirectResponse
@@ -34,24 +37,30 @@ class QuestionController extends BaseAdminController
         $this->authorizeCourseAccess($question->lesson->course);
 
         $validated = $this->validateQuestion($request);
+        $lessonId = $question->lesson_id;
 
         return $this->tryActionBack(function () use ($question, $validated) {
             $question->update([
                 'title' => $validated['title'],
                 'type' => $validated['type'],
+                'points' => $validated['points'],
                 'options' => array_values($validated['options']),
                 'correct_answers' => $validated['correct'],
             ]);
-        }, 'Question updated.');
+
+            $question->lesson->recalculateTotalScore();
+        }, 'Question updated.')->with('reopen_quiz', $lessonId);
     }
 
     public function destroy(Question $question): RedirectResponse
     {
         $this->authorizeCourseAccess($question->lesson->course);
+        $lesson = $question->lesson;
 
-        return $this->tryActionBack(function () use ($question) {
+        return $this->tryActionBack(function () use ($question, $lesson) {
             $question->delete();
-        }, 'Question removed.');
+            $lesson->recalculateTotalScore();
+        }, 'Question removed.')->with('reopen_quiz', $lesson->id);
     }
 
     private function validateQuestion(Request $request): array
@@ -59,6 +68,7 @@ class QuestionController extends BaseAdminController
         return $request->validate([
             'title' => ['required', 'string', 'max:500'],
             'type' => ['required', 'in:single_choice,multiple_choice'],
+            'points' => ['required', 'integer', 'min:1', 'max:100'],
             'options' => ['required', 'array', 'min:2'],
             'options.*' => ['required', 'string', 'max:255'],
             'correct' => ['required', 'array', 'min:1'],

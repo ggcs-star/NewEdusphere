@@ -30,8 +30,8 @@
         </a>
     @endif
 
-    {{-- Stats --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    {{-- Catalog stats --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
         <x-admin.stat-card
             icon="fa-layer-group"
             color="violet"
@@ -56,13 +56,7 @@
             :change="$stats['students']['change']"
             :direction="$stats['students']['direction']"
         />
-        <x-admin.stat-card
-            icon="fa-sack-dollar"
-            color="sky"
-            :count="'$'.number_format($revenue, 2)"
-            label="Total Revenue"
-            :change="0"
-            direction="flat"
-        />
     </div>
+
+    <x-admin.revenue-analytics :analytics="$analytics" period-route="admin.dashboard" :is-admin="true" />
 </x-layouts.admin>
