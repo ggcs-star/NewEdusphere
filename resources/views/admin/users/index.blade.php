@@ -108,10 +108,7 @@
                                 </div>
                             </td>
                             <td class="px-5 py-3.5">
-                                <x-admin.badge :color="$user->role === 'admin' ? 'brand' : 'slate'">{{ ucfirst($user->role) }}</x-admin.badge>
-                                @if ($user->is_instructor)
-                                    <x-admin.badge color="accent">Instructor</x-admin.badge>
-                                @endif
+                                <x-admin.badge :color="match ($user->role) { 'admin' => 'brand', 'instructor' => 'accent', default => 'slate' }">{{ ucfirst($user->role) }}</x-admin.badge>
                             </td>
                             <td class="px-5 py-3.5 text-slate-600">{{ $user->courses_count }}</td>
                             <td class="px-5 py-3.5 text-slate-600">{{ $user->enrollments_count }}</td>

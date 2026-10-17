@@ -169,27 +169,38 @@
     <a href="{{ route('home') }}"
        target="_blank"
        rel="noopener noreferrer"
-       class="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">
+       class="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-3 sm:px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">
         <i class="fa-solid fa-arrow-up-right-from-square"></i>
         <span class="hidden sm:inline">Visit Website</span>
         <span class="sm:hidden">Website</span>
     </a>
 
-    {{-- Notifications --}}
-    <button type="button"
-        class="relative h-10 w-10 flex items-center justify-center rounded-full hover:bg-brand-50 text-brand-700 transition">
-        <i class="fa-regular fa-bell text-lg"></i>
-        <span class="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-accent-500 ring-2 ring-white"></span>
-    </button>
+                    <div class="relative pl-4 border-l border-slate-200" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                        <button type="button" @click="open = !open" class="flex items-center gap-2.5 cursor-pointer">
+                            <div class="h-9 w-9 rounded-full bg-brand-900 text-white flex items-center justify-center font-semibold text-sm overflow-hidden flex-shrink-0">
+                                @if (current_admin_user()?->avatarUrl())
+                                    <img src="{{ current_admin_user()->avatarUrl() }}" alt="" class="h-full w-full object-cover">
+                                @else
+                                    {{ strtoupper(substr(current_admin_user()->name ?? ($inInstructorPortal ? 'I' : 'A'), 0, 1)) }}
+                                @endif
+                            </div>
+                            <span class="hidden sm:inline text-sm font-semibold text-slate-700">{{ current_admin_user()->name ?? ($inInstructorPortal ? 'Instructor' : 'Admin') }}</span>
+                            <svg class="h-4 w-4 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                        </button>
 
-
-
-                    <div class="flex items-center gap-2.5 pl-4 border-l border-slate-200">
-                        <div class="h-9 w-9 rounded-full bg-brand-900 text-white flex items-center justify-center font-semibold text-sm">
-                            {{ strtoupper(substr(current_admin_user()->name ?? ($inInstructorPortal ? 'I' : 'A'), 0, 1)) }}
+                        <div x-show="open" x-cloak x-transition.origin.top.right
+                            class="absolute right-0 mt-2 w-48 rounded-xl bg-white border border-slate-200 shadow-lg overflow-hidden z-30">
+                            <a href="{{ $inInstructorPortal ? route('instructor.profile.edit') : route('admin.profile.edit') }}"
+                                class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-brand-50 transition">
+                                <i class="fa-regular fa-user w-4 text-slate-400"></i> My Profile
+                            </a>
+                            <form method="POST" action="{{ route('logout') }}" class="border-t border-slate-100">
+                                @csrf
+                                <button type="submit" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition text-left">
+                                    <i class="fa-solid fa-arrow-right-from-bracket w-4"></i> Sign out
+                                </button>
+                            </form>
                         </div>
-                        <span class="hidden sm:inline text-sm font-semibold text-slate-700">{{ current_admin_user()->name ?? ($inInstructorPortal ? 'Instructor' : 'Admin') }}</span>
-                        <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                     </div>
                 </div>
             </header>

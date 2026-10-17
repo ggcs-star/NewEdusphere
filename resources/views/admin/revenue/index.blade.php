@@ -108,19 +108,19 @@
             <x-admin.stat-card
                 icon="fa-receipt"
                 color="violet"
-                :count="'$'.number_format($totals->total_amount, 2)"
+                :count="format_price($totals->total_amount)"
                 :label="$totals->total_sales.' transactions'"
             />
             <x-admin.stat-card
                 icon="fa-building-columns"
                 color="emerald"
-                :count="'$'.number_format($totals->total_admin, 2)"
+                :count="format_price($totals->total_admin)"
                 label="Platform Revenue"
             />
             <x-admin.stat-card
                 icon="fa-hand-holding-dollar"
                 color="amber"
-                :count="'$'.number_format($totals->total_instructor, 2)"
+                :count="format_price($totals->total_instructor)"
                 label="Instructor Payouts"
             />
         </div>
@@ -143,8 +143,8 @@
                             <tr class="hover:bg-brand-50/30 transition">
                                 <td class="px-5 py-3.5 text-sm font-semibold text-brand-950">{{ $payment->user->name ?? '—' }}</td>
                                 <td class="px-5 py-3.5 text-slate-600 truncate max-w-xs" title="{{ $payment->course->title ?? '' }}">{{ $payment->course->title ?? '—' }}</td>
-                                <td class="px-5 py-3.5 font-semibold text-brand-950">${{ number_format($payment->amount, 2) }}</td>
-                                <td class="px-5 py-3.5 text-emerald-600 font-semibold">${{ number_format($payment->admin_revenue, 2) }}</td>
+                                <td class="px-5 py-3.5 font-semibold text-brand-950">{{ format_price($payment->amount) }}</td>
+                                <td class="px-5 py-3.5 text-emerald-600 font-semibold">{{ format_price($payment->admin_revenue) }}</td>
                                 <td class="px-5 py-3.5 text-slate-500">{{ $payment->created_at->format('D, d M Y') }}</td>
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center justify-end">
@@ -175,19 +175,19 @@
             <x-admin.stat-card
                 icon="fa-chalkboard-user"
                 color="violet"
-                :count="'$'.number_format($totals->total_instructor, 2)"
+                :count="format_price($totals->total_instructor)"
                 :label="$totals->total_sales.' transactions'"
             />
             <x-admin.stat-card
                 icon="fa-circle-check"
                 color="emerald"
-                :count="'$'.number_format($paidOut, 2)"
+                :count="format_price($paidOut)"
                 label="Paid Out"
             />
             <x-admin.stat-card
                 icon="fa-clock"
                 color="amber"
-                :count="'$'.number_format($totals->total_instructor - $paidOut, 2)"
+                :count="format_price($totals->total_instructor - $paidOut)"
                 label="Pending Payout"
             />
         </div>
@@ -219,8 +219,8 @@
                                     <td class="px-5 py-3.5 text-slate-600">{{ $payment->course->instructor->name ?? '—' }}</td>
                                 @endif
                                 <td class="px-5 py-3.5">
-                                    <p class="font-semibold text-accent-600">${{ number_format($payment->instructor_revenue, 2) }}</p>
-                                    <p class="text-xs text-slate-400">Total: ${{ number_format($payment->amount, 2) }}</p>
+                                    <p class="font-semibold text-accent-600">{{ format_price($payment->instructor_revenue) }}</p>
+                                    <p class="text-xs text-slate-400">Total: {{ format_price($payment->amount) }}</p>
                                 </td>
                                 <td class="px-5 py-3.5">
                                     <x-admin.badge :color="$payment->instructor_paid_out ? 'emerald' : 'slate'">{{ $payment->instructor_paid_out ? 'Paid' : 'Pending' }}</x-admin.badge>

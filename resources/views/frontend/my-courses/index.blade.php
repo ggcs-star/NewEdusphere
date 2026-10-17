@@ -26,8 +26,8 @@
                 <div><small>Successful payments</small><strong>{{ number_format($successfulPayments) }}</strong></div>
             </div>
             <div class="ml-stat">
-                <span class="ml-stat-icon">₹</span>
-                <div><small>Total paid</small><strong>₹{{ number_format((float) $totalSpent, 2) }}</strong></div>
+                <span class="ml-stat-icon">{{ currency_symbol() }}</span>
+                <div><small>Total paid</small><strong>{{ format_price((float) $totalSpent) }}</strong></div>
             </div>
         </div>
 
@@ -134,7 +134,7 @@
                                 <div class="ml-payment-content">
                                     <div class="ml-price-row">
                                         <span>Amount paid / recorded</span>
-                                        <strong>₹{{ number_format((float) $payment->amount, 2) }}</strong>
+                                        <strong>{{ format_price((float) $payment->amount) }}</strong>
                                     </div>
 
                                     <div class="ml-detail-row">
@@ -173,16 +173,6 @@
                                             </div>
                                         </div>
                                     @endif
-
-                                    <div class="ml-detail-row">
-                                        <span>Admin revenue recorded</span>
-                                        <strong>₹{{ number_format((float) $payment->admin_revenue, 2) }}</strong>
-                                    </div>
-
-                                    <div class="ml-detail-row">
-                                        <span>Instructor revenue recorded</span>
-                                        <strong>₹{{ number_format((float) $payment->instructor_revenue, 2) }}</strong>
-                                    </div>
                                 </div>
                             @else
                                 <p class="ml-no-payment">

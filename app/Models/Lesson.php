@@ -13,8 +13,12 @@ class Lesson extends Model
     use HasFactory;
 
     protected $fillable = [
-        'course_id', 'section_id', 'title', 'lesson_type', 'total_score',
+        'course_id', 'section_id', 'title', 'lesson_type', 'total_score', 'allow_retry',
         'video_type', 'video_url', 'duration', 'attachment', 'summary', 'order',
+    ];
+
+    protected $casts = [
+        'allow_retry' => 'boolean',
     ];
 
     public function course(): BelongsTo

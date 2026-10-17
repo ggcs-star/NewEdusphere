@@ -17,6 +17,7 @@ use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\CheckoutController;
 use App\Http\Controllers\Frontend\MyCoursesController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ProfileController;
 use App\Models\Category;
 use App\Models\Course;
 use Illuminate\Http\Request;
@@ -125,6 +126,9 @@ Route::get('/categories', function () {
 })->name('categories.index');
 
 Route::view('/about', 'frontend.about')->name('about');
+
+Route::view('/terms', 'frontend.legal', ['heading' => 'Terms & Conditions', 'field' => 'terms_and_condition'])->name('terms');
+Route::view('/privacy', 'frontend.legal', ['heading' => 'Privacy Policy', 'field' => 'privacy_policy'])->name('privacy');
 
 Route::get('/contact', function () {
     return view('frontend.contact');
@@ -336,35 +340,8 @@ Route::get('/my-certificates/{certificate}', [
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/profile', function () {
-        $user = current_admin_user();
-
-        abort_unless($user, 403);
-
-        return view('frontend.profile.index', compact('user'));
-    })->name('profile.edit');
-
-    Route::put('/profile', function (Request $request) {
-        $user = current_admin_user();
-
-        abort_unless($user, 403);
-
-        $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['nullable', 'string', 'max:100'],
-            'biography' => ['nullable', 'string', 'max:5000'],
-        ]);
-
-        $user->first_name = $validated['first_name'];
-        $user->last_name = $validated['last_name'] ?? '';
-        $user->biography = $validated['biography'] ?? '';
-        $user->save();
-
-        return back()->with(
-            'success',
-            'Profile updated successfully.'
-        );
-    })->name('profile.update');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
 /*
@@ -710,11 +687,19 @@ Route::delete('/certificates/{certificateTemplate}', [CertificateTemplateControl
     // Languages (settings sub-feature)
     Route::post('/languages', [LanguageController::class, 'store'])->name('languages.store');
     Route::delete('/languages/{language}', [LanguageController::class, 'destroy'])->name('languages.destroy');
+
+    // Profile (the admin's own account)
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
 Route::middleware(['web.auth', 'instructor'])->prefix('instructor')->name('instructor.')->group(function () {
     Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
     Route::get('/revenue', [InstructorRevenueController::class, 'index'])->name('revenue.index');
+
+    // Profile (the instructor's own account)
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     // Own courses
     Route::get('/courses', [InstructorCourseController::class, 'index'])->name('courses.index');

@@ -20,14 +20,20 @@
 
     {{-- Stats --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
-        <x-admin.stat-card icon="fa-book-open" color="violet" :count="$stats['total']" label="Total Courses" :change="0" direction="flat" />
-        <x-admin.stat-card icon="fa-circle-check" color="emerald" :count="$stats['active']" label="Live" :change="0" direction="flat" />
-        <x-admin.stat-card icon="fa-hourglass-half" color="amber" :count="$stats['pending']" label="Pending Review" :change="0" direction="flat" />
-        <x-admin.stat-card icon="fa-circle-xmark" color="sky" :count="$stats['rejected']" label="Rejected" :change="0" direction="flat" />
+        <x-admin.stat-card icon="fa-book-open" color="violet" :count="$stats['total']" label="Total Courses" :change="0" direction="flat" :href="route('instructor.courses.index')" />
+        <x-admin.stat-card icon="fa-circle-check" color="emerald" :count="$stats['active']" label="Live" :change="0" direction="flat" :href="route('instructor.courses.index', ['status' => 'active'])" />
+        <x-admin.stat-card icon="fa-hourglass-half" color="amber" :count="$stats['pending']" label="Pending Review" :change="0" direction="flat" :href="route('instructor.courses.index', ['status' => 'pending'])" />
+        <x-admin.stat-card icon="fa-circle-xmark" color="sky" :count="$stats['rejected']" label="Rejected" :change="0" direction="flat" :href="route('instructor.courses.index', ['status' => 'rejected'])" />
         <x-admin.stat-card icon="fa-user-graduate" color="violet" :count="$stats['students']" label="Students Enrolled" :change="0" direction="flat" />
     </div>
 
-    <x-admin.revenue-analytics :analytics="$analytics" period-route="instructor.dashboard" :is-admin="false" />
+    <x-admin.revenue-analytics
+        :analytics="$analytics"
+        period-route="instructor.dashboard"
+        revenue-route="instructor.revenue.index"
+        courses-route="instructor.courses.index"
+        :is-admin="false"
+    />
 
     {{-- Recent courses --}}
     <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">

@@ -21,9 +21,7 @@ class UserController extends BaseAdminController
         $query = User::withCount(['courses', 'enrollments'])->latest();
 
         if ($role = $request->get('role')) {
-            if ($role === 'instructor') {
-                $query->where('is_instructor', true);
-            } elseif ($role !== 'all') {
+            if ($role !== 'all') {
                 $query->where('role', $role);
             }
         }
@@ -40,7 +38,7 @@ class UserController extends BaseAdminController
             'stats' => [
                 'total' => $this->trends->forModel(User::class, fn ($q) => $q),
                 'active' => $this->trends->forModel(User::class, fn ($q) => $q->where('status', true)),
-                'instructors' => $this->trends->forModel(User::class, fn ($q) => $q->where('is_instructor', true)),
+                'instructors' => $this->trends->forModel(User::class, fn ($q) => $q->where('role', 'instructor')),
                 'admins' => $this->trends->forModel(User::class, fn ($q) => $q->where('role', 'admin')),
             ],
         ]);
@@ -58,7 +56,7 @@ class UserController extends BaseAdminController
                 ->get()
                 ->pluck('course')
                 ->filter(),
-            'taughtCourses' => $user->is_instructor
+            'taughtCourses' => $user->isInstructor()
                 ? $user->courses()->withCount('enrollments')->with(['category', 'subCategory'])->latest()->get()
                 : collect(),
         ]);
@@ -73,9 +71,8 @@ class UserController extends BaseAdminController
     {
         $validated = $this->validateUser($request);
 
-        return $this->tryAction(function () use ($validated, $request) {
+        return $this->tryAction(function () use ($validated) {
             $validated['password'] = Hash::make($validated['password']);
-            $validated['is_instructor'] = $request->boolean('is_instructor');
 
             User::create($validated);
         }, 'User created successfully.', 'admin.users.index');
@@ -90,9 +87,7 @@ class UserController extends BaseAdminController
     {
         $validated = $this->validateUser($request, $user);
 
-        return $this->tryAction(function () use ($validated, $request, $user) {
-            $validated['is_instructor'] = $request->boolean('is_instructor');
-
+        return $this->tryAction(function () use ($validated, $user) {
             if (filled($validated['password'] ?? null)) {
                 $validated['password'] = Hash::make($validated['password']);
             } else {
@@ -139,8 +134,7 @@ class UserController extends BaseAdminController
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,'.($user?->id ?? 'NULL')],
             'password' => [$user ? 'nullable' : 'required', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,user'],
-            'is_instructor' => ['sometimes', 'boolean'],
+            'role' => ['required', 'in:admin,instructor,user'],
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
     }

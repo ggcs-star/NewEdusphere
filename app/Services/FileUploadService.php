@@ -53,4 +53,11 @@ class FileUploadService
 
         return $storage->delete($path);
     }
+
+    public function delete(?string $path, string $disk = 'public'): void
+    {
+        if ($path) {
+            Storage::disk($disk)->delete($path);
+        }
+    }
 }

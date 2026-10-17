@@ -75,6 +75,17 @@
                 @endif
             </div>
 
+            {{-- Quiz --}}
+            <div x-show="lessonType === 'quiz'">
+                <label class="inline-flex items-center gap-2">
+                    <input type="hidden" name="allow_retry" value="0">
+                    <input type="checkbox" name="allow_retry" value="1" @checked(old('allow_retry', $model->allow_retry ?? false))
+                        class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    <span class="text-sm text-slate-700">Allow students to retry this quiz</span>
+                </label>
+                <p class="text-xs text-slate-400 mt-1">By default each student can attempt a quiz only once. Turn this on to let them retake it.</p>
+            </div>
+
             {{-- Document --}}
             <div x-show="lessonType === 'document'">
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">Content</label>

@@ -11,49 +11,17 @@ use Illuminate\View\View;
 
 class SettingController extends BaseAdminController
 {
-    private const TABS = ['system', 'frontend', 'payment', 'smtp', 'instructor', 'languages'];
-
-    private const IMAGE_FIELDS = ['banner_image', 'light_logo', 'dark_logo', 'small_logo', 'favicon'];
+    private const TABS = ['system', 'frontend', 'theme', 'payment', 'smtp', 'instructor', 'languages'];
 
     private const DEFAULTS = [
-        'system' => [
-            'system_name' => 'EduSphere',
-            'system_title' => 'EduSphere — Online Learning Platform',
-            'website_keywords' => '',
-            'website_description' => '',
-            'author' => '',
-            'slogan' => '',
-            'system_email' => '',
-            'address' => '',
-            'phone' => '',
-            'youtube_api_key' => '',
-            'vimeo_api_key' => '',
-            'purchase_code' => '',
-            'student_email_verification' => 'disable',
-            'footer_link' => '',
-        ],
-        'frontend' => [
-            'banner_title' => '',
-            'banner_sub_title' => '',
-            'about_us' => '',
-            'terms_and_condition' => '',
-            'privacy_policy' => '',
-        ],
+        'system' => Setting::DEFAULTS['system'],
+        'frontend' => Setting::DEFAULTS['frontend'],
+        'theme' => Setting::DEFAULTS['theme'],
         'payment' => [
             'system_currency' => 'USD',
             'currency_position' => 'left',
-            'paypal_active' => '0',
-            'paypal_mode' => 'sandbox',
-            'paypal_currency' => 'USD',
-            'paypal_sandbox_client_id' => '',
-            'paypal_production_client_id' => '',
-            'stripe_active' => '0',
-            'stripe_testmode' => 'on',
-            'stripe_currency' => 'USD',
-            'stripe_test_secret_key' => '',
-            'stripe_test_public_key' => '',
-            'stripe_live_secret_key' => '',
-            'stripe_live_public_key' => '',
+            'razorpay_key' => '',
+            'razorpay_secret' => '',
         ],
         'smtp' => [
             'smtp_protocol' => 'smtp',
@@ -91,7 +59,7 @@ class SettingController extends BaseAdminController
         $values = array_merge(self::DEFAULTS[$tab], Setting::group($tab));
 
         if ($tab === 'frontend') {
-            foreach (self::IMAGE_FIELDS as $field) {
+            foreach (Setting::IMAGE_FIELDS as $field) {
                 $values[$field] = Setting::get($field);
             }
         }
@@ -104,8 +72,6 @@ class SettingController extends BaseAdminController
             'values' => $values,
             'languages' => collect(),
             'allCurrencies' => $currencies->map(fn ($c, $code) => "{$code} — {$c['name']}"),
-            'paypalCurrencies' => $currencies->filter(fn ($c) => $c['paypal'])->map(fn ($c, $code) => "{$code} — {$c['name']}"),
-            'stripeCurrencies' => $currencies->filter(fn ($c) => $c['stripe'])->map(fn ($c, $code) => "{$code} — {$c['name']}"),
         ]);
     }
 
@@ -117,16 +83,29 @@ class SettingController extends BaseAdminController
 
         $fields = array_keys(self::DEFAULTS[$tab]);
 
+        if ($tab === 'theme') {
+            $request->validate(
+                array_fill_keys($fields, ['required', 'regex:/^#[0-9a-fA-F]{6}$/']),
+                array_fill_keys(
+                    array_map(fn ($f) => "{$f}.regex", $fields),
+                    'Please enter a valid hex color code (e.g. #32105F).'
+                )
+            );
+        }
+
         return $this->tryAction(function () use ($fields, $request, $tab) {
             foreach ($fields as $field) {
                 Setting::set($field, $request->input($field, '0'), $tab);
             }
 
             if ($tab === 'frontend') {
-                foreach (self::IMAGE_FIELDS as $field) {
+                foreach (Setting::IMAGE_FIELDS as $field) {
                     if ($request->hasFile($field)) {
                         $path = $this->uploads->replace(Setting::get($field), $request->file($field), 'branding');
                         Setting::set($field, $path, 'frontend');
+                    } elseif ($request->boolean("remove_{$field}")) {
+                        $this->uploads->delete(Setting::get($field));
+                        Setting::set($field, '', 'frontend');
                     }
                 }
             }

@@ -85,23 +85,102 @@ class LessonProgressController extends Controller
 
         abort_unless($lesson, 404);
 
-        $progress = LessonProgress::query()
-            ->where('user_id', $viewer->id)
-            ->where('course_id', $course->id)
-            ->where('lesson_id', $lessonId)
+        $hasAccess = (bool) $course->is_free
+            || DB::table('enrollments')
+                ->where('user_id', $viewer->id)
+                ->where('course_id', $course->id)
+                ->exists();
+
+        // Keep the existing rule: the first two course lessons
+        // are available as free previews.
+        if (!$hasAccess) {
+            $previewIds = $course->sections
+                ->sortBy(fn ($section) => (int) $section->order)
+                ->flatMap(function ($section) {
+                    return $section->lessons
+                        ->sortBy(fn ($item) => (int) $item->order);
+                })
+                ->take(2)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $hasAccess = in_array(
+                (int) $lesson->id,
+                $previewIds,
+                true
+            );
+        }
+
+        abort_unless($hasAccess, 403, 'You do not have access to this course.');
+
+        abort_unless(
+            $lesson->lesson_type === 'quiz',
+            422,
+            'This lesson is not a quiz.'
+        );
+
+        return [$course, $lesson];
+    }
+
+    /**
+     * Return quiz questions without correct answers.
+     * If the quiz was already submitted, return its saved result.
+     */
+    public function show(Request $request, int $courseId, int $lessonId): JsonResponse
+    {
+        $viewer = $this->viewer();
+
+        [, $lesson] = $this->accessibleLesson(
+            $courseId,
+            $lessonId,
+            $viewer
+        );
+
+        $attempt = QuizAttempt::where('user_id', $viewer->id)
+            ->where('lesson_id', $lesson->id)
             ->first();
 
+        // A fresh attempt is only handed out when the admin allowed retries
+        // and the student explicitly asked to retake the quiz.
+        $wantsRetry = $attempt && $lesson->allow_retry && $request->boolean('retry');
+
+        if ($attempt && !$wantsRetry) {
+            return response()->json([
+                'submitted' => true,
+                'allow_retry' => (bool) $lesson->allow_retry,
+                'result' => $this->resultData($attempt, $lesson),
+                'retry_url' => $lesson->allow_retry
+                    ? route('courses.quizzes.show', [$courseId, $lessonId]) . '?retry=1'
+                    : null,
+            ]);
+        }
+
+        $questions = $lesson->questions()
+            ->orderBy('order')
+            ->get()
+            ->map(function (Question $question) {
+                $options = $question->options ?? [];
+
+                return [
+                    'id' => $question->id,
+                    'title' => $question->title,
+                    'type' => $question->type,
+                    'points' => (int) $question->points,
+                    'options' => array_values($options),
+                ];
+            })
+            ->values();
+
         return response()->json([
-            'position' => (int) (
-                $progress?->last_position_seconds ?? 0
-            ),
-            'duration' => (int) (
-                $progress?->duration_seconds ?? 0
-            ),
-            'completed' => (bool) (
-                $progress?->is_completed ?? false
-            ),
-            'watched_ranges' => $progress?->watched_ranges ?? [],
+            'submitted' => false,
+            'allow_retry' => (bool) $lesson->allow_retry,
+            'questions' => $questions,
+            'total_score' => (int) $lesson->questions()->sum('points'),
+            'submit_url' => route('courses.quizzes.submit', [
+                $courseId,
+                $lessonId,
+            ]),
         ]);
     }
 
@@ -116,27 +195,36 @@ class LessonProgressController extends Controller
         int $courseId,
         int $lessonId
     ): JsonResponse {
-        $data = $request->validate([
-            'position' => ['required', 'numeric', 'min:0'],
-            'duration' => ['required', 'numeric', 'min:1'],
-        ]);
+        $viewer = $this->viewer();
 
-        $viewer = $this->viewer($request);
-
-        abort_unless($viewer && $viewer->id, 401);
-
-        $course = Course::with('sections.lessons')
-            ->whereKey($courseId)
-            ->firstOrFail();
-
-        abort_unless(
-            $this->canAccess($course, $viewer),
-            403
+        [, $lesson] = $this->accessibleLesson(
+            $courseId,
+            $lessonId,
+            $viewer
         );
 
-        $lesson = $course->sections
-            ->flatMap(fn ($section) => $section->lessons)
-            ->firstWhere('id', $lessonId);
+        $existing = QuizAttempt::where('user_id', $viewer->id)
+            ->where('lesson_id', $lesson->id)
+            ->first();
+
+        if ($existing && !$lesson->allow_retry) {
+            return response()->json([
+                'message' => 'This quiz has already been submitted.',
+                'submitted' => true,
+                'allow_retry' => false,
+                'result' => $this->resultData($existing, $lesson),
+            ], 409);
+        }
+
+        $validated = $request->validate([
+            'answers' => ['required', 'array'],
+            'answers.*' => ['present'],
+            'answers.*' => ['nullable'],
+        ]);
+
+        $questions = $lesson->questions()
+            ->orderBy('order')
+            ->get();
 
         abort_unless($lesson, 404);
 
@@ -324,101 +412,106 @@ class LessonProgressController extends Controller
 
             $progress->save();
 
-            return [
-                'newly_completed' => $completed && !$alreadyCompleted,
-                'position' => $position,
-                'duration' => $duration,
-                'watched_seconds' => $watchedSeconds,
-                'coverage_percent' => round(
-                    $coverage * 100,
-                    2
-                ),
-                'completed' => $completed,
-                'watched_ranges' => $merged,
-            ];
-        });
-
-        /*
-         * Check certificate eligibility when this request completed the
-         * lesson, or when an already-completed lesson is replayed to its end.
-         * Not on every 1-second tick, to avoid hammering the service.
-         */
-        $newlyCompleted = (bool) $result['newly_completed'];
-        unset($result['newly_completed']);
-
-        $certificate = [
-            'status' => 'not_checked',
-            'message' => null,
-            'url' => null,
+        $attributes = [
+            'score' => $score,
+            'total_score' => $totalScore,
+            'answers' => $savedAnswers,
+            'submitted_at' => now(),
         ];
 
-        if (
-            $result['completed'] &&
-            ($newlyCompleted || $position >= ($duration - 5))
-        ) {
-            $certificate = $this->checkCertificate(
-                (int) $viewer->id,
-                (int) $course->id
-            );
+        try {
+            if ($existing) {
+                // Retry: overwrite the previous attempt with the new one.
+                $existing->update($attributes);
+                $attempt = $existing;
+            } else {
+                $attempt = QuizAttempt::create([
+                    'user_id' => $viewer->id,
+                    'lesson_id' => $lesson->id,
+                    ...$attributes,
+                ]);
+            }
+        } catch (QueryException $exception) {
+            // The database unique constraint handles simultaneous first-time submissions.
+            $attempt = QuizAttempt::where('user_id', $viewer->id)
+                ->where('lesson_id', $lesson->id)
+                ->first();
+
+            if (!$attempt) {
+                throw $exception;
+            }
+
+            if (!$lesson->allow_retry) {
+                return response()->json([
+                    'message' => 'This quiz has already been submitted.',
+                    'submitted' => true,
+                    'allow_retry' => false,
+                    'result' => $this->resultData($attempt, $lesson),
+                ], 409);
+            }
+
+            $attempt->update($attributes);
         }
 
         return response()->json([
-            'success' => true,
-            ...$result,
-            'certificate_status' => $certificate['status'],
-            'certificate_issued' => $certificate['status'] === 'issued',
-            'certificate_message' => $certificate['message'],
-            'certificate_url' => $certificate['url'],
+            'message' => 'Quiz submitted successfully.',
+            'submitted' => true,
+            'allow_retry' => (bool) $lesson->allow_retry,
+            'result' => $this->resultData($attempt, $lesson),
         ]);
     }
 
-    /**
-     * Run the issuance service and report exactly what happened:
-     * issued | already_issued | incomplete | error.
-     * Failures are logged, never swallowed.
-     */
-    private function checkCertificate(int $userId, int $courseId): array
+    private function resultData(QuizAttempt $attempt, Lesson $lesson): array
     {
-        try {
-            $existedBefore = Certificate::query()
-                ->where('user_id', $userId)
-                ->where('course_id', $courseId)
-                ->exists();
+        $answers = $attempt->answers ?? [];
 
-            app(CertificateIssuanceService::class)
-                ->issueIfEligible($userId, $courseId);
+        $review = $lesson->questions()
+            ->orderBy('order')
+            ->get()
+            ->map(function (Question $question) use ($answers) {
+                $options = array_values($question->options ?? []);
 
-            // Re-read from the DB so the result does not depend on the
-            // service's return value.
-            $certificate = Certificate::query()
-                ->where('user_id', $userId)
-                ->where('course_id', $courseId)
-                ->latest('id')
-                ->first();
+                $correct = array_values(array_unique(array_map(
+                    'intval',
+                    $question->correct_answers ?? []
+                )));
+                sort($correct);
 
-            if ($certificate === null) {
+                $given = $answers[(string) $question->id] ?? null;
+
+                if ($question->type === 'multiple_choice') {
+                    $givenAnswer = is_array($given)
+                        ? array_values(array_unique(array_map('intval', $given)))
+                        : [];
+                    $givenSorted = $givenAnswer;
+                    sort($givenSorted);
+                    $isCorrect = $givenSorted === $correct;
+                } else {
+                    $givenAnswer = $given === null ? null : (int) $given;
+                    $isCorrect = $givenAnswer !== null && in_array($givenAnswer, $correct, true);
+                }
+
                 return [
-                    'status' => 'incomplete',
-                    'message' => 'Certificate not issued yet: finish all lessons and submit every quiz (or the course has no active certificate template).',
-                    'url' => null,
+                    'id' => $question->id,
+                    'title' => $question->title,
+                    'type' => $question->type,
+                    'points' => (int) $question->points,
+                    'options' => $options,
+                    'correct_answers' => $correct,
+                    'given_answer' => $givenAnswer,
+                    'is_correct' => $isCorrect,
                 ];
-            }
+            })
+            ->values();
 
-            $url = Route::has('user.certificates.show')
-                ? route('user.certificates.show', $certificate->id)
-                : null;
-
-            return $existedBefore
-                ? ['status' => 'already_issued', 'message' => 'Certificate already issued.', 'url' => $url]
-                : ['status' => 'issued', 'message' => 'Certificate issued.', 'url' => $url];
-        } catch (Throwable $e) {
-            Log::error('Certificate issuance failed after lesson completion', [
-                'user_id' => $userId,
-                'course_id' => $courseId,
-                'exception' => $e,
-            ]);
-
-            return ['status' => 'error', 'message' => 'Certificate could not be issued. Please contact support.', 'url' => null];
-        }
+        return [
+            'score' => (int) $attempt->score,
+            'total_score' => (int) $attempt->total_score,
+            'percentage' => $attempt->total_score > 0
+                ? round($attempt->score / $attempt->total_score * 100, 2)
+                : 0,
+            'submitted_at' => $attempt->submitted_at?->toIso8601String(),
+            'review' => $review,
+        ];
     }
 }

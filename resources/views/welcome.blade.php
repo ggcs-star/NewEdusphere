@@ -1,6 +1,8 @@
 @extends('layouts.frontend')
 
-@section('title', 'Home')
+{{-- No @section('title') here on purpose — the layout falls back to the
+     admin-configured Website Title (Settings -> System) for the homepage,
+     while every other page sets its own specific title. --}}
 
 @push('meta')
     <link rel="stylesheet" href="{{ asset('css/home.css') }}">

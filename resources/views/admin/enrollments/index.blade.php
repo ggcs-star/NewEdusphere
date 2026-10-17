@@ -131,10 +131,10 @@
                                 @elseif ($enrollment->course->is_free)
                                     <span class="text-xs font-semibold text-emerald-600">Free</span>
                                 @elseif ($enrollment->course->hasDiscount())
-                                    <span class="text-slate-700 font-medium">${{ number_format($enrollment->course->discount_price, 2) }}</span>
-                                    <span class="text-xs text-slate-400 line-through ml-1">${{ number_format($enrollment->course->price, 2) }}</span>
+                                    <span class="text-slate-700 font-medium">{{ format_price($enrollment->course->discount_price) }}</span>
+                                    <span class="text-xs text-slate-400 line-through ml-1">{{ format_price($enrollment->course->price) }}</span>
                                 @else
-                                    <span class="text-slate-700 font-medium">${{ number_format($enrollment->course->price, 2) }}</span>
+                                    <span class="text-slate-700 font-medium">{{ format_price($enrollment->course->price) }}</span>
                                 @endif
                             </td>
                             <td class="px-5 py-3.5 text-slate-500">{{ $enrollment->created_at->format('D, d M Y') }}</td>
