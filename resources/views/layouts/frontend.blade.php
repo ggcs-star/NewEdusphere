@@ -77,6 +77,7 @@
             ? $siteSettings[$key]
             : $fallback;
     @endphp
+<link rel="stylesheet" href="{{ asset('css/home.css') }}">
     <style>
         :root {
             --purple: {{ $themeColor('theme_primary_color', '#32105f') }};
