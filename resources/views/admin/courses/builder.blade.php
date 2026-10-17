@@ -183,6 +183,10 @@
                                             @if ($lesson->questions->isNotEmpty())
                                                 <p class="text-xs text-slate-400 mt-0.5">Total: {{ $lesson->total_score }} points across {{ $lesson->questions->count() }} question{{ $lesson->questions->count() === 1 ? '' : 's' }}</p>
                                             @endif
+                                            <p class="text-xs mt-0.5 {{ $lesson->allow_retry ? 'text-emerald-600' : 'text-slate-400' }}">
+                                                <i class="fa-solid {{ $lesson->allow_retry ? 'fa-rotate-right' : 'fa-lock' }} text-[10px]"></i>
+                                                {{ $lesson->allow_retry ? 'Retry allowed' : 'One attempt only' }}
+                                            </p>
                                         </div>
                                         <button type="button" @click="questionsOpen = null; addQuestionOpen = false" class="text-slate-400 hover:text-slate-600">
                                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

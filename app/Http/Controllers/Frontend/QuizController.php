@@ -84,7 +84,7 @@ class QuizController extends Controller
      * Return quiz questions without correct answers.
      * If the quiz was already submitted, return its saved result.
      */
-    public function show(int $courseId, int $lessonId): JsonResponse
+    public function show(Request $request, int $courseId, int $lessonId): JsonResponse
     {
         $viewer = $this->viewer();
 
@@ -98,10 +98,18 @@ class QuizController extends Controller
             ->where('lesson_id', $lesson->id)
             ->first();
 
-        if ($attempt) {
+        // A fresh attempt is only handed out when the admin allowed retries
+        // and the student explicitly asked to retake the quiz.
+        $wantsRetry = $attempt && $lesson->allow_retry && $request->boolean('retry');
+
+        if ($attempt && !$wantsRetry) {
             return response()->json([
                 'submitted' => true,
-                'result' => $this->resultData($attempt),
+                'allow_retry' => (bool) $lesson->allow_retry,
+                'result' => $this->resultData($attempt, $lesson),
+                'retry_url' => $lesson->allow_retry
+                    ? route('courses.quizzes.show', [$courseId, $lessonId]) . '?retry=1'
+                    : null,
             ]);
         }
 
@@ -123,6 +131,7 @@ class QuizController extends Controller
 
         return response()->json([
             'submitted' => false,
+            'allow_retry' => (bool) $lesson->allow_retry,
             'questions' => $questions,
             'total_score' => (int) $lesson->questions()->sum('points'),
             'submit_url' => route('courses.quizzes.submit', [
@@ -152,11 +161,12 @@ class QuizController extends Controller
             ->where('lesson_id', $lesson->id)
             ->first();
 
-        if ($existing) {
+        if ($existing && !$lesson->allow_retry) {
             return response()->json([
                 'message' => 'This quiz has already been submitted.',
                 'submitted' => true,
-                'result' => $this->resultData($existing),
+                'allow_retry' => false,
+                'result' => $this->resultData($existing, $lesson),
             ], 409);
         }
 
@@ -266,17 +276,27 @@ class QuizController extends Controller
 
         $totalScore = (int) $questions->sum('points');
 
+        $attributes = [
+            'score' => $score,
+            'total_score' => $totalScore,
+            'answers' => $savedAnswers,
+            'submitted_at' => now(),
+        ];
+
         try {
-            $attempt = QuizAttempt::create([
-                'user_id' => $viewer->id,
-                'lesson_id' => $lesson->id,
-                'score' => $score,
-                'total_score' => $totalScore,
-                'answers' => $savedAnswers,
-                'submitted_at' => now(),
-            ]);
+            if ($existing) {
+                // Retry: overwrite the previous attempt with the new one.
+                $existing->update($attributes);
+                $attempt = $existing;
+            } else {
+                $attempt = QuizAttempt::create([
+                    'user_id' => $viewer->id,
+                    'lesson_id' => $lesson->id,
+                    ...$attributes,
+                ]);
+            }
         } catch (QueryException $exception) {
-            // The database unique constraint handles simultaneous submissions.
+            // The database unique constraint handles simultaneous first-time submissions.
             $attempt = QuizAttempt::where('user_id', $viewer->id)
                 ->where('lesson_id', $lesson->id)
                 ->first();
@@ -285,22 +305,69 @@ class QuizController extends Controller
                 throw $exception;
             }
 
-            return response()->json([
-                'message' => 'This quiz has already been submitted.',
-                'submitted' => true,
-                'result' => $this->resultData($attempt),
-            ], 409);
+            if (!$lesson->allow_retry) {
+                return response()->json([
+                    'message' => 'This quiz has already been submitted.',
+                    'submitted' => true,
+                    'allow_retry' => false,
+                    'result' => $this->resultData($attempt, $lesson),
+                ], 409);
+            }
+
+            $attempt->update($attributes);
         }
 
         return response()->json([
             'message' => 'Quiz submitted successfully.',
             'submitted' => true,
-            'result' => $this->resultData($attempt),
+            'allow_retry' => (bool) $lesson->allow_retry,
+            'result' => $this->resultData($attempt, $lesson),
         ]);
     }
 
-    private function resultData(QuizAttempt $attempt): array
+    private function resultData(QuizAttempt $attempt, Lesson $lesson): array
     {
+        $answers = $attempt->answers ?? [];
+
+        $review = $lesson->questions()
+            ->orderBy('order')
+            ->get()
+            ->map(function (Question $question) use ($answers) {
+                $options = array_values($question->options ?? []);
+
+                $correct = array_values(array_unique(array_map(
+                    'intval',
+                    $question->correct_answers ?? []
+                )));
+                sort($correct);
+
+                $given = $answers[(string) $question->id] ?? null;
+
+                if ($question->type === 'multiple_choice') {
+                    $givenAnswer = is_array($given)
+                        ? array_values(array_unique(array_map('intval', $given)))
+                        : [];
+                    $givenSorted = $givenAnswer;
+                    sort($givenSorted);
+                    $isCorrect = $givenSorted === $correct;
+                } else {
+                    $givenAnswer = $given === null ? null : (int) $given;
+                    $isCorrect = $givenAnswer !== null && in_array($givenAnswer, $correct, true);
+                }
+
+                return [
+                    'id' => $question->id,
+                    'title' => $question->title,
+                    'type' => $question->type,
+                    'points' => (int) $question->points,
+                    'options' => $options,
+                    'correct_answers' => $correct,
+                    'given_answer' => $givenAnswer,
+                    'is_correct' => $isCorrect,
+                ];
+            })
+            ->values();
+
         return [
             'score' => (int) $attempt->score,
             'total_score' => (int) $attempt->total_score,
@@ -308,6 +375,7 @@ class QuizController extends Controller
                 ? round($attempt->score / $attempt->total_score * 100, 2)
                 : 0,
             'submitted_at' => $attempt->submitted_at?->toIso8601String(),
+            'review' => $review,
         ];
     }
 }

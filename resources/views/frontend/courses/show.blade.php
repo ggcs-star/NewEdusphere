@@ -199,6 +199,7 @@ $buildQuiz = function ($lesson) use ($pick, $readList): array {
             'a' => $answer,
             'type' => $type,
             'why' => trim(strip_tags((string) $field('explanation', ''))),
+            'points' => max(1, (int) $field('points', 1)),
         ];
     }
 
@@ -466,8 +467,9 @@ $isCourseUnlocked = (bool) (
                                                 $courseLessonIndex++;
 
                                                 // Do not place locked lesson media/resources in HTML data attributes.
-                                                $quizData  = ($canAccessLesson && $kind === 'quiz') ? $buildQuiz($lesson) : [];
-                                                $quizCount = count($quizData);
+                                                // Quiz questions/answers are fetched from the server at open time
+                                                // (never embedded in the page) so answers can't be read from the HTML.
+                                                $quizCount = $kind === 'quiz' ? $lesson->questions->count() : 0;
                                             @endphp
                                             <button
                                                 type="button"
@@ -487,7 +489,11 @@ $isCourseUnlocked = (bool) (
                                                 data-summary="{{ $canAccessLesson ? $summary : '' }}"
                                                 data-attachment="{{ $canAccessLesson ? $attachment : '' }}"
                                                 data-attname="{{ $canAccessLesson ? $attName : '' }}"
-                                                @if ($kind === 'quiz' && $canAccessLesson) data-quiz="{{ json_encode($quizData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}" data-qcount="{{ $quizCount }}" @endif
+                                                @if ($kind === 'quiz' && $canAccessLesson)
+                                                    data-qcount="{{ $quizCount }}"
+                                                    data-quiz-show-url="{{ route('courses.quizzes.show', [(int) $course->id, (int) $lesson->id]) }}"
+                                                    data-quiz-submit-url="{{ route('courses.quizzes.submit', [(int) $course->id, (int) $lesson->id]) }}"
+                                                @endif
                                             >
                                                 <span class="cd-lesson__icon">{!! $canAccessLesson ? $icons[$kindIcon] : $icons['lock'] ?? $icons['alert'] !!}</span>
                                                 <span class="cd-lesson__text">
@@ -636,6 +642,33 @@ $isCourseUnlocked = (bool) (
                 </div>
             </aside>
             @endunless
+
+            {{-- ---------- Quiz scores: enrolled students only ---------- --}}
+            @if ($isEnrolled && $quizScoreSummary)
+            <aside class="cd-side cd-side--quiz" aria-label="Quiz scores">
+                <div class="cd-quizscore" id="cdQuizScores">
+                    <div class="cd-quizscore__head">
+                        <h4>{!! $icons['quiz'] !!} Quiz Scores</h4>
+                        <div class="cd-quizscore__total">
+                            <span>Total Score</span>
+                            <strong><span id="cdQuizScoresAchieved">{{ $quizScoreSummary['total_achieved'] }}</span> <em>/ {{ $quizScoreSummary['total_possible'] }}</em></strong>
+                        </div>
+                    </div>
+                    <ul class="cd-quizscore__list">
+                        @foreach ($quizScoreSummary['quizzes'] as $quiz)
+                            <li data-quiz-lesson-id="{{ $quiz['id'] }}">
+                                <span class="cd-quizscore__name">{{ $quiz['title'] }}</span>
+                                @if ($quiz['attempted'])
+                                    <span class="cd-quizscore__score">{{ $quiz['score'] }} / {{ $quiz['total_score'] }}</span>
+                                @else
+                                    <span class="cd-quizscore__score is-pending">Not attempted</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </aside>
+            @endif
         </div>
     </div>
 
@@ -728,7 +761,8 @@ $isCourseUnlocked = (bool) (
         close:    {!! json_encode($icons['close']) !!},
         refresh:  {!! json_encode($icons['refresh']) !!},
         trophy:   {!! json_encode($icons['trophy']) !!},
-        right:    {!! json_encode($icons['right']) !!}
+        right:    {!! json_encode($icons['right']) !!},
+        left:     {!! json_encode($icons['left']) !!}
     };
     var KIND_LABEL = { video: 'Video lesson', document: 'Document', quiz: 'Quiz' };
     var QUIZ_KEY = 'cd_quiz_{{ (int) $course->id }}_';
@@ -858,6 +892,7 @@ $isCourseUnlocked = (bool) (
     var youtubePlayerReady = false;  // true only after the saved position was restored
     var activeVideo = null;          // {el, ready} for uploaded videos
     var progressToken = 0;           // changes on every lesson open/close; stale async work is ignored
+    var docToken = 0;                // changes on every document render; stale fetch checks are ignored
     var youtubeApiState = 'idle';    // idle | loading
     var youtubeApiWaiters = [];
     var progressShow = document.getElementById('cdLessonProgress');
@@ -1202,21 +1237,37 @@ $isCourseUnlocked = (bool) (
     }
 
 function renderDocument(data) {
+    var myToken = ++docToken;
+
     screen.replaceChildren();
-    screen.className = 'cd-screen cd-screen--document';
+    screen.className = 'cd-screen';
 
     if (!data.attachment) {
         setNote('No document has been attached to this lesson yet.', true);
         return;
     }
 
-    var iframe = document.createElement('iframe');
-    iframe.src = data.attachment;
-    iframe.title = data.attname || data.title || 'Course document';
-    iframe.setAttribute('loading', 'lazy');
-    iframe.setAttribute('allowfullscreen', 'true');
+    var loader = el('div', 'cd-loader');
+    screen.appendChild(loader);
 
-    screen.appendChild(iframe);
+    fetch(data.attachment, { method: 'HEAD' }).then(function (res) {
+        if (myToken !== docToken) return;
+        if (!res.ok) { setNote('No document is available for this lesson yet.', true); return; }
+
+        screen.replaceChildren();
+        screen.className = 'cd-screen cd-screen--document';
+
+        var iframe = document.createElement('iframe');
+        iframe.src = data.attachment;
+        iframe.title = data.attname || data.title || 'Course document';
+        iframe.setAttribute('loading', 'lazy');
+        iframe.setAttribute('allowfullscreen', 'true');
+
+        screen.appendChild(iframe);
+    }).catch(function () {
+        if (myToken !== docToken) return;
+        setNote('No document is available for this lesson yet.', true);
+    });
 }
 
     /* =====================================================
@@ -1237,132 +1288,214 @@ function renderDocument(data) {
         chip.textContent = 'Best score: ' + b + '%';
     }
 
-    function renderQuiz(btn) {
-        var questions = [];
-        try { questions = JSON.parse(btn.dataset.quiz || '[]'); } catch (e) { questions = []; }
-        if (!Array.isArray(questions)) questions = [];
+    function updateSidebarQuizScore(lessonId, score, totalScore) {
+        var card = document.getElementById('cdQuizScores');
+        if (!card || !lessonId) return;
 
+        var item = card.querySelector('li[data-quiz-lesson-id="' + lessonId + '"]');
+        if (item) {
+            var scoreEl = item.querySelector('.cd-quizscore__score');
+            if (scoreEl) {
+                scoreEl.textContent = score + ' / ' + totalScore;
+                scoreEl.classList.remove('is-pending');
+            }
+        }
+
+        var achievedEl = document.getElementById('cdQuizScoresAchieved');
+        if (achievedEl) {
+            var sum = 0;
+            card.querySelectorAll('.cd-quizscore__score').forEach(function (el) {
+                if (el.classList.contains('is-pending')) return;
+                var n = parseInt(el.textContent, 10);
+                if (!isNaN(n)) sum += n;
+            });
+            achievedEl.textContent = sum;
+        }
+    }
+
+    function renderQuiz(btn) {
+        var showUrl = btn.dataset.quizShowUrl || '';
+        var submitUrl = btn.dataset.quizSubmitUrl || '';
         var lessonId = btn.dataset.id || '';
 
-        screen.replaceChildren();
-        screen.className = 'cd-screen cd-screen--quiz';
-
-        if (!questions.length) {
-            var empty = el('div', 'cd-quiz__empty');
-            empty.innerHTML = ICON.quiz;
-            empty.appendChild(el('h4', '', 'Questions coming soon'));
-            empty.appendChild(el('p', '', 'This quiz does not have any questions yet. Please check back later.'));
-            screen.appendChild(empty);
+        if (!showUrl) {
+            setNote('This quiz could not be loaded.', true);
             return;
         }
 
-        var N = questions.length;
-        var st;
+        loadQuiz(showUrl);
 
-        function start() {
-            st = { i: 0, score: 0, scored: 0, picked: [] };
-            showQuestion();
+        function loadQuiz(url) {
+            screen.replaceChildren();
+            screen.className = 'cd-screen cd-screen--quiz';
+            screen.appendChild(el('div', 'cd-loader'));
+
+            fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+                .then(function (res) {
+                    if (!res.ok) { setNote((res.data && res.data.message) || 'This quiz could not be loaded.', true); return; }
+                    if (res.data.submitted) {
+                        buildResultScreen(res.data.result, {
+                            allowRetry: !!res.data.allow_retry,
+                            onRetry: res.data.retry_url ? function () { loadQuiz(res.data.retry_url); } : null,
+                            alreadySubmitted: true,
+                        });
+                    } else {
+                        runQuiz(res.data);
+                    }
+                })
+                .catch(function () { setNote('This quiz could not be loaded.', true); });
         }
 
-        function showQuestion() {
-            var q = questions[st.i];
-            var wrap = el('div', 'cd-quiz');
-            screen.replaceChildren(wrap);
+        function runQuiz(data) {
+            var questions = Array.isArray(data.questions) ? data.questions : [];
+            var totalScore = parseInt(data.total_score, 10) || 0;
 
-            var top = el('div', 'cd-quiz__top');
-            top.appendChild(el('span', '', 'Question ' + (st.i + 1) + ' of ' + N));
-            var sc = el('span', 'cd-quiz__score', 'Score: ' + st.score);
-            top.appendChild(sc);
-            wrap.appendChild(top);
+            screen.className = 'cd-screen cd-screen--quiz';
 
-            var bar = el('div', 'cd-quiz__bar');
-            var fill = el('span');
-            fill.style.width = (st.i / N * 100) + '%';
-            bar.appendChild(fill);
-            wrap.appendChild(bar);
-            requestAnimationFrame(function () { requestAnimationFrame(function () { fill.style.width = ((st.i + 1) / N * 100) + '%'; }); });
-
-            var qEl = el('h4', 'cd-quiz__q', (st.i + 1) + '. ' + q.q);
-            qEl.tabIndex = -1;
-            wrap.appendChild(qEl);
-
-            var list = el('div', 'cd-quiz__opts');
-            list.setAttribute('role', 'group');
-            list.setAttribute('aria-label', 'Answer options');
-            var fb = el('div');
-            var foot = el('div', 'cd-quiz__foot');
-            var optBtns = [];
-
-            q.opts.forEach(function (text, idx) {
-                var b = el('button', 'cd-opt');
-                b.type = 'button';
-                b.style.animationDelay = (idx * 60 + 80) + 'ms';
-                var key = el('span', 'cd-opt__key', String.fromCharCode(65 + idx));
-                var label = el('span', 'cd-opt__text', text);
-                var mark = el('span', 'cd-opt__mark');
-                mark.innerHTML = ICON.check;
-                b.appendChild(key); b.appendChild(label); b.appendChild(mark);
-                b.addEventListener('click', function () { choose(idx); });
-                list.appendChild(b);
-                optBtns.push(b);
-            });
-            wrap.appendChild(list);
-            wrap.appendChild(fb);
-            wrap.appendChild(foot);
-
-            function choose(idx) {
-                if (st.picked[st.i] !== undefined) return;
-                st.picked[st.i] = idx;
-
-                optBtns.forEach(function (b, i) {
-                    b.disabled = true;
-                    if (q.a >= 0) {
-                        if (i === q.a) b.classList.add('is-correct');
-                        else if (i === idx) { b.classList.add('is-wrong'); b.querySelector('.cd-opt__mark').innerHTML = ICON.close; }
-                        else b.classList.add('is-dim');
-                    } else {
-                        if (i === idx) b.classList.add('is-picked'); else b.classList.add('is-dim');
-                    }
-                });
-
-                var box;
-                if (q.a >= 0) {
-                    st.scored++;
-                    if (idx === q.a) {
-                        st.score++;
-                        sc.textContent = 'Score: ' + st.score;
-                        box = el('div', 'cd-quiz__fb cd-quiz__fb--ok');
-                        box.appendChild(el('strong', '', 'Correct!'));
-                    } else {
-                        box = el('div', 'cd-quiz__fb cd-quiz__fb--no');
-                        box.appendChild(el('strong', '', 'Not quite.'));
-                        box.appendChild(document.createTextNode('Correct answer: ' + q.opts[q.a]));
-                    }
-                } else {
-                    box = el('div', 'cd-quiz__fb cd-quiz__fb--neutral');
-                    box.appendChild(el('strong', '', 'Answer recorded.'));
-                }
-                if (q.why) { var why = el('div', '', q.why); why.style.marginTop = '4px'; box.appendChild(why); }
-                fb.replaceChildren(box);
-
-                var last = st.i === N - 1;
-                var go = el('button', 'cd-btn cd-btn--gold');
-                go.type = 'button';
-                go.innerHTML = '<span>' + (last ? 'See results' : 'Next question') + '</span>' + ICON.right;
-                go.addEventListener('click', function () { if (last) showResult(); else { st.i++; showQuestion(); scroller.scrollTop = 0; } });
-                foot.appendChild(go);
-                go.focus({ preventScroll: true });
-                go.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+            if (!questions.length) {
+                var empty = el('div', 'cd-quiz__empty');
+                empty.innerHTML = ICON.quiz;
+                empty.appendChild(el('h4', '', 'Questions coming soon'));
+                empty.appendChild(el('p', '', 'This quiz does not have any questions yet. Please check back later.'));
+                screen.replaceChildren(empty);
+                return;
             }
 
-            qEl.focus({ preventScroll: true });
+            var N = questions.length;
+            var answers = {};
+            var i = 0;
+
+            showQuestion();
+
+            function showQuestion() {
+                var q = questions[i];
+                var isMulti = q.type === 'multiple_choice';
+                var wrap = el('div', 'cd-quiz');
+                screen.replaceChildren(wrap);
+
+                var top = el('div', 'cd-quiz__top');
+                var qPoints = q.points || 1;
+                top.appendChild(el('span', '', 'Question ' + (i + 1) + ' of ' + N + ' · worth ' + qPoints + (qPoints === 1 ? ' point' : ' points')));
+                if (totalScore) top.appendChild(el('span', 'cd-quiz__score', 'Total: ' + totalScore + (totalScore === 1 ? ' point' : ' points')));
+                wrap.appendChild(top);
+
+                var bar = el('div', 'cd-quiz__bar');
+                var fill = el('span');
+                fill.style.width = (i / N * 100) + '%';
+                bar.appendChild(fill);
+                wrap.appendChild(bar);
+                requestAnimationFrame(function () { requestAnimationFrame(function () { fill.style.width = ((i + 1) / N * 100) + '%'; }); });
+
+                wrap.appendChild(el('span', 'cd-quiz__type', isMulti ? 'Multiple choice · select all that apply' : 'Single choice · select one answer'));
+
+                var qEl = el('h4', 'cd-quiz__q', (i + 1) + '. ' + q.title);
+                qEl.tabIndex = -1;
+                wrap.appendChild(qEl);
+
+                var list = el('div', 'cd-quiz__opts');
+                list.setAttribute('role', 'group');
+                list.setAttribute('aria-label', 'Answer options');
+                var foot = el('div', 'cd-quiz__foot');
+                var optBtns = [];
+
+                var existing = answers[q.id];
+                var selectedMulti = isMulti ? (Array.isArray(existing) ? existing.slice() : []) : null;
+                var selectedSingle = !isMulti ? (typeof existing === 'number' ? existing : null) : null;
+
+                (q.options || []).forEach(function (text, idx) {
+                    var b = el('button', 'cd-opt' + (isMulti ? ' cd-opt--multi' : ''));
+                    b.type = 'button';
+                    b.style.animationDelay = (idx * 60 + 80) + 'ms';
+                    var key = el('span', 'cd-opt__key', String.fromCharCode(65 + idx));
+                    var label = el('span', 'cd-opt__text', text);
+                    var mark = el('span', 'cd-opt__mark');
+                    mark.innerHTML = ICON.check;
+                    b.appendChild(key); b.appendChild(label); b.appendChild(mark);
+
+                    var isSelected = isMulti ? selectedMulti.indexOf(idx) !== -1 : selectedSingle === idx;
+                    if (isSelected) b.classList.add('is-picked');
+
+                    b.addEventListener('click', function () {
+                        if (isMulti) {
+                            var at = selectedMulti.indexOf(idx);
+                            if (at === -1) selectedMulti.push(idx); else selectedMulti.splice(at, 1);
+                            b.classList.toggle('is-picked');
+                            answers[q.id] = selectedMulti.slice();
+                        } else {
+                            selectedSingle = idx;
+                            optBtns.forEach(function (ob) { ob.classList.remove('is-picked'); });
+                            b.classList.add('is-picked');
+                            answers[q.id] = selectedSingle;
+                        }
+                    });
+                    list.appendChild(b);
+                    optBtns.push(b);
+                });
+                wrap.appendChild(list);
+                wrap.appendChild(foot);
+
+                if (i > 0) {
+                    var back = el('button', 'cd-btn cd-btn--outline');
+                    back.type = 'button';
+                    back.innerHTML = ICON.left + ' <span>Back</span>';
+                    back.addEventListener('click', function () { i--; showQuestion(); scroller.scrollTop = 0; });
+                    foot.appendChild(back);
+                }
+
+                var last = i === N - 1;
+                var go = el('button', 'cd-btn cd-btn--gold');
+                go.type = 'button';
+                if (i === 0) go.style.marginLeft = 'auto';
+                go.innerHTML = '<span>' + (last ? 'Submit quiz' : 'Next question') + '</span>' + ICON.right;
+                go.addEventListener('click', function () {
+                    if (last) { submitQuiz(go); } else { i++; showQuestion(); scroller.scrollTop = 0; }
+                });
+                foot.appendChild(go);
+
+                qEl.focus({ preventScroll: true });
+            }
+
+            function submitQuiz(go) {
+                go.disabled = true;
+                go.innerHTML = '<span>Submitting…</span>';
+
+                var payload = {};
+                questions.forEach(function (q) {
+                    var given = answers[q.id];
+                    payload[q.id] = given !== undefined ? given : (q.type === 'multiple_choice' ? [] : null);
+                });
+
+                fetch(submitUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': btn.dataset.csrf || ''
+                    },
+                    body: JSON.stringify({ answers: payload })
+                })
+                    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+                    .then(function (res) {
+                        if (!res.data || !res.data.result) { setNote('This quiz could not be submitted. Please try again.', true); return; }
+                        buildResultScreen(res.data.result, {
+                            allowRetry: !!res.data.allow_retry,
+                            onRetry: res.data.allow_retry ? function () { loadQuiz(showUrl + (showUrl.indexOf('?') === -1 ? '?' : '&') + 'retry=1'); } : null,
+                            alreadySubmitted: !res.ok,
+                        });
+                    })
+                    .catch(function () { setNote('This quiz could not be submitted. Please try again.', true); });
+            }
         }
 
-        function showResult() {
-            var pct = st.scored ? Math.round(st.score / st.scored * 100) : 100;
+        function buildResultScreen(result, opts) {
+            var pct = result.percentage || 0;
             saveBest(lessonId, pct);
             refreshBestChip(lessonId);
+            updateSidebarQuizScore(lessonId, result.score, result.total_score);
 
+            screen.className = 'cd-screen cd-screen--quiz';
             var wrap = el('div', 'cd-quiz');
             var res = el('div', 'cd-result');
             screen.replaceChildren(wrap);
@@ -1376,17 +1509,23 @@ function renderDocument(data) {
 
             var headline = pct >= 80 ? 'Excellent work!' : (pct >= 50 ? 'Good effort!' : 'Keep practising!');
             res.appendChild(el('h4', '', headline));
-            res.appendChild(el('p', '', st.scored
-                ? 'You answered ' + st.score + ' of ' + st.scored + ' questions correctly.'
-                : 'You have completed this quiz.'));
+            res.appendChild(el('p', '', 'You scored ' + result.score + ' out of ' + result.total_score + ' points.'));
+            if (opts.alreadySubmitted) {
+                res.appendChild(el('p', 'cd-result__note', opts.allowRetry
+                    ? 'This is your saved result for this quiz.'
+                    : 'You already completed this quiz — only one attempt is allowed.'));
+            }
 
             var actions = el('div', 'cd-result__actions');
-            var retry = el('button', 'cd-btn cd-btn--outline cd-btn--sm'); retry.type = 'button';
-            retry.innerHTML = ICON.refresh + ' <span>Retry quiz</span>';
-            retry.addEventListener('click', function () { start(); scroller.scrollTop = 0; });
+            if (opts.onRetry) {
+                var retry = el('button', 'cd-btn cd-btn--outline cd-btn--sm'); retry.type = 'button';
+                retry.innerHTML = ICON.refresh + ' <span>Retry quiz</span>';
+                retry.addEventListener('click', opts.onRetry);
+                actions.appendChild(retry);
+            }
             var review = el('button', 'cd-btn cd-btn--outline cd-btn--sm'); review.type = 'button';
             review.innerHTML = ICON.quiz + ' <span>Review answers</span>';
-            actions.appendChild(retry); actions.appendChild(review);
+            actions.appendChild(review);
 
             if (current < lessons.length - 1) {
                 var cont = el('button', 'cd-btn cd-btn--gold cd-btn--sm'); cont.type = 'button';
@@ -1397,14 +1536,21 @@ function renderDocument(data) {
             res.appendChild(actions);
 
             var list = el('div', 'cd-review'); list.hidden = true;
-            questions.forEach(function (q, i) {
-                var chosen = st.picked[i];
-                var ok = q.a >= 0 && chosen === q.a;
-                var item = el('div', 'cd-review__item ' + (q.a < 0 ? '' : (ok ? 'ok' : 'no')));
-                item.style.animationDelay = (i * 40) + 'ms';
-                item.appendChild(el('strong', '', (i + 1) + '. ' + q.q));
-                item.appendChild(el('span', q.a < 0 ? '' : (ok ? 'good' : 'bad'), 'Your answer: ' + (chosen !== undefined ? q.opts[chosen] : 'Not answered')));
-                if (q.a >= 0 && !ok) item.appendChild(el('span', 'good', 'Correct answer: ' + q.opts[q.a]));
+            (result.review || []).forEach(function (q, idx) {
+                var ok = q.is_correct;
+                var item = el('div', 'cd-review__item ' + (ok ? 'ok' : 'no'));
+                item.style.animationDelay = (idx * 40) + 'ms';
+                item.appendChild(el('strong', '', (idx + 1) + '. ' + q.title));
+
+                var given = q.type === 'multiple_choice'
+                    ? ((q.given_answer || []).length ? q.given_answer.map(function (o) { return q.options[o]; }).join(', ') : 'Not answered')
+                    : (q.given_answer !== null && q.given_answer !== undefined ? q.options[q.given_answer] : 'Not answered');
+                item.appendChild(el('span', ok ? 'good' : 'bad', 'Your answer: ' + given));
+
+                if (!ok) {
+                    var correctText = (q.correct_answers || []).map(function (o) { return q.options[o]; }).join(', ');
+                    item.appendChild(el('span', 'good', 'Correct answer: ' + (correctText || '—')));
+                }
                 list.appendChild(item);
             });
             res.appendChild(list);
@@ -1413,12 +1559,11 @@ function renderDocument(data) {
                 if (!list.hidden) list.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
             });
 
-            // animate ring + number
             var bar = ring.querySelector('.bar');
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () { bar.style.strokeDashoffset = String(327 * (1 - pct / 100)); });
             });
-            if (reduceMotion) { num.textContent = pct + '%'; }
+            if (reduceMotion) { num.textContent = Math.round(pct) + '%'; }
             else {
                 var t0 = null, dur = 900;
                 (function tick(ts) {
@@ -1430,8 +1575,6 @@ function renderDocument(data) {
             }
             scroller.scrollTop = 0;
         }
-
-        start();
     }
 
     function renderInfo(kind, data) {

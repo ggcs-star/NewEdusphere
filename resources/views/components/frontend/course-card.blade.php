@@ -3,6 +3,9 @@
         ? $course->effectivePrice()
         : ($course->price ?? 0);
 
+    $hasDiscount = method_exists($course, 'hasDiscount') && $course->hasDiscount();
+    $discountPercent = $hasDiscount && method_exists($course, 'discountPercent') ? $course->discountPercent() : 0;
+
     $courseImage = $course->thumbnail ?? null;
 
     $courseUrl = url(
@@ -48,12 +51,21 @@
 
         <div class="meta-row">
             <span>◷ {{ $course->duration ?? 'Self-paced' }}</span>
+            <span>▤ {{ ucfirst($course->level ?? 'All levels') }}</span>
             <span>★ {{ $course->rating ?? 'New' }}</span>
         </div>
 
         <div class="list-row">
             <span class="price">
-                {{ !empty($course->is_free) ? 'Free' : format_price((float) $coursePrice, 0) }}
+                @if (!empty($course->is_free))
+                    Free
+                @else
+                    {{ format_price((float) $coursePrice, 0) }}
+                    @if ($hasDiscount)
+                        <span class="course-old-price">{{ format_price((float) $course->price, 0) }}</span>
+                        <span class="course-discount">{{ $discountPercent }}% off</span>
+                    @endif
+                @endif
             </span>
 
             <a class="btn btn-purple" href="{{ $courseUrl }}">

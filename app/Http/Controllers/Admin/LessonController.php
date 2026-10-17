@@ -112,7 +112,7 @@ class LessonController extends BaseAdminController
 
     private function validateLesson(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'lesson_type' => ['required', 'in:video,document,quiz'],
             'video_type' => ['nullable', 'in:youtube,vimeo,upload'],
@@ -121,6 +121,11 @@ class LessonController extends BaseAdminController
             'duration' => ['nullable', 'string', 'max:50'],
             'summary' => ['nullable', 'string'],
             'attachment_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,txt,zip', 'max:20480'],
+            'allow_retry' => ['sometimes', 'boolean'],
         ]);
+
+        $validated['allow_retry'] = $request->boolean('allow_retry');
+
+        return $validated;
     }
 }

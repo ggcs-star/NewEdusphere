@@ -44,6 +44,6 @@ class Category extends Model
     {
         return $this->thumbnail
             ? asset('storage/'.$this->thumbnail)
-            : asset('images/category-placeholder.png');
+            : asset('images/category-placeholder.svg');
     }
 }

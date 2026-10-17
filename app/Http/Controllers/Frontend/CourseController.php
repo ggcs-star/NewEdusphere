@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Frontend;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Course;
+use App\Models\QuizAttempt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -69,7 +70,7 @@ class CourseController extends Controller
             'instructor',
             'category',
             'subCategory',
-            'sections.lessons',
+            'sections.lessons.questions',
         ])
             ->where('status', 'active')
             ->where('id', $id)
@@ -114,13 +115,59 @@ class CourseController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
 
+        $quizScoreSummary = $isEnrolled
+            ? $this->quizScoreSummary($viewer, $allLessons)
+            : null;
+
         return view('frontend.courses.show', [
             'course' => $course,
             'relatedCourses' => $relatedCourses,
             'isEnrolled' => $isEnrolled,
             'isCourseUnlocked' => $isCourseUnlocked,
             'previewLessonIds' => $previewLessonIds,
+            'quizScoreSummary' => $quizScoreSummary,
         ]);
+    }
+
+    /**
+     * Build the per-quiz / total score breakdown shown in the course
+     * sidebar for enrolled students, based on their saved quiz attempts.
+     */
+    private function quizScoreSummary($viewer, $allLessons): ?array
+    {
+        if (!$viewer || empty($viewer->id)) {
+            return null;
+        }
+
+        $quizLessons = $allLessons->where('lesson_type', 'quiz')->values();
+
+        if ($quizLessons->isEmpty()) {
+            return null;
+        }
+
+        $attempts = QuizAttempt::where('user_id', $viewer->id)
+            ->whereIn('lesson_id', $quizLessons->pluck('id'))
+            ->get()
+            ->keyBy('lesson_id');
+
+        $quizzes = $quizLessons->map(function ($lesson) use ($attempts) {
+            $attempt = $attempts->get($lesson->id);
+
+            return [
+                'id' => $lesson->id,
+                'title' => $lesson->title,
+                'total_score' => (int) $lesson->total_score,
+                'score' => $attempt ? (int) $attempt->score : null,
+                'attempted' => (bool) $attempt,
+            ];
+        })->values()->all();
+
+        return [
+            'quizzes' => $quizzes,
+            'total_possible' => (int) $quizLessons->sum('total_score'),
+            'total_achieved' => (int) $attempts->sum('score'),
+            'attempted_count' => $attempts->count(),
+        ];
     }
 
     /**

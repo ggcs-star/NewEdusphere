@@ -161,16 +161,6 @@
                                             </div>
                                         </div>
                                     @endif
-
-                                    <div class="ml-detail-row">
-                                        <span>Admin revenue recorded</span>
-                                        <strong>{{ format_price((float) $payment->admin_revenue) }}</strong>
-                                    </div>
-
-                                    <div class="ml-detail-row">
-                                        <span>Instructor revenue recorded</span>
-                                        <strong>{{ format_price((float) $payment->instructor_revenue) }}</strong>
-                                    </div>
                                 </div>
                             @else
                                 <p class="ml-no-payment">

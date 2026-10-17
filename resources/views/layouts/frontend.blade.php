@@ -482,6 +482,14 @@
             text-decoration: line-through;
         }
 
+        .course-discount {
+            display: block;
+            color: #d6336c;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
         .course-actions {
             display: flex;
             align-items: center;
@@ -1324,7 +1332,6 @@
                 <h4>Account</h4>
                 <a href="{{ route('login') }}">Login</a>
                 <a href="{{ route('register') }}">Register</a>
-                <a href="{{ url('/my-courses') }}">My Learning</a>
             </div>
 
             <div class="footer-col">
