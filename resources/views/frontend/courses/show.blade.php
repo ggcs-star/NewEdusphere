@@ -4,6 +4,8 @@
 
 @section('content')
 @php
+    $isEnrolled = (bool) ($isEnrolled ?? false);
+
     /* ---------- Helpers ---------- */
     $ic = function (string $paths, bool $fill = false): string {
         return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="' . ($fill ? 'currentColor' : 'none')
@@ -307,8 +309,10 @@ $buildQuiz = function ($lesson) use ($pick, $readList): array {
 
     // Access flags are supplied by CourseController. The first two lessons
     // across the whole course are free previews, even across different sections.
-    $isCourseUnlocked = (bool) ($isCourseUnlocked ?? ((bool) ($course->is_free ?? false) || (bool) ($isEnrolled ?? false)));
-    $courseLessonIndex = 0;
+$isCourseUnlocked = (bool) (
+    $isCourseUnlocked
+    ?? ($isFree || $isEnrolled)
+);    $courseLessonIndex = 0;
 
     $kindLabels = ['video' => 'Video lesson', 'document' => 'Document', 'quiz' => 'Quiz'];
 
