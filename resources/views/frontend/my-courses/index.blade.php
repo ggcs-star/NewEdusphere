@@ -57,7 +57,7 @@
 
                 <article class="ml-card">
                     <a class="ml-image-wrap"
-                       href="{{ url('/courses/' . $course->slug . '/' . $course->id) }}">
+                       href="{{ url('/home/course/' . $course->slug . '/' . $course->id) }}">
                         <img src="{{ $course->thumbnailUrl() }}"
                              alt="{{ $course->title }}"
                              loading="lazy">
@@ -97,7 +97,10 @@
                             <strong>{{ $enrollment?->created_at?->format('d M Y') ?? '—' }}</strong>
                         </div>
 
-                        <a href="{{ url('/courses/' . $course->slug . '/' . $course->id) }}"
+                        <a href="{{ route('home.course.show', [
+    'slug' => $course->slug,
+    'id' => $course->id,
+]) }}"
                            class="ml-continue">
                             View course <span>→</span>
                         </a>

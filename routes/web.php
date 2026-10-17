@@ -24,6 +24,8 @@ use App\Http\Controllers\Instructor\CourseController as InstructorCourseControll
 use App\Http\Controllers\Instructor\DashboardController as InstructorDashboardController;
 use App\Http\Controllers\Instructor\RevenueController as InstructorRevenueController;
 use App\Http\Controllers\Frontend\CourseController as FrontendCourseController;
+use App\Http\Controllers\Frontend\LessonProgressController;
+use App\Http\Controllers\Frontend\QuizController;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -35,12 +37,34 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get(
+    '/courses/{courseId}/lessons/{lessonId}/progress',
+    [LessonProgressController::class, 'show']
+)->name('courses.lessons.progress.show');
 
+Route::post(
+    '/courses/{courseId}/lessons/{lessonId}/progress',
+    [LessonProgressController::class, 'save']
+)->name('courses.lessons.progress.save');
 /*
 |--------------------------------------------------------------------------
 | Public Frontend Pages
 |--------------------------------------------------------------------------
 */
+
+Route::get(
+    '/courses/{courseId}/lessons/{lessonId}/quiz',
+    [QuizController::class, 'show']
+)->whereNumber('courseId')
+ ->whereNumber('lessonId')
+ ->name('courses.quizzes.show');
+
+Route::post(
+    '/courses/{courseId}/lessons/{lessonId}/quiz',
+    [QuizController::class, 'submit']
+)->whereNumber('courseId')
+ ->whereNumber('lessonId')
+ ->name('courses.quizzes.submit');
 
 Route::get('/courses', function (Request $request) {
     $query = Course::query()
