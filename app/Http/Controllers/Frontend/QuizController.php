@@ -327,47 +327,6 @@ class QuizController extends Controller
 
     private function resultData(QuizAttempt $attempt, Lesson $lesson): array
     {
-        $answers = $attempt->answers ?? [];
-
-        $review = $lesson->questions()
-            ->orderBy('order')
-            ->get()
-            ->map(function (Question $question) use ($answers) {
-                $options = array_values($question->options ?? []);
-
-                $correct = array_values(array_unique(array_map(
-                    'intval',
-                    $question->correct_answers ?? []
-                )));
-                sort($correct);
-
-                $given = $answers[(string) $question->id] ?? null;
-
-                if ($question->type === 'multiple_choice') {
-                    $givenAnswer = is_array($given)
-                        ? array_values(array_unique(array_map('intval', $given)))
-                        : [];
-                    $givenSorted = $givenAnswer;
-                    sort($givenSorted);
-                    $isCorrect = $givenSorted === $correct;
-                } else {
-                    $givenAnswer = $given === null ? null : (int) $given;
-                    $isCorrect = $givenAnswer !== null && in_array($givenAnswer, $correct, true);
-                }
-
-                return [
-                    'id' => $question->id,
-                    'title' => $question->title,
-                    'type' => $question->type,
-                    'points' => (int) $question->points,
-                    'options' => $options,
-                    'correct_answers' => $correct,
-                    'given_answer' => $givenAnswer,
-                    'is_correct' => $isCorrect,
-                ];
-            })
-            ->values();
-
         return [
             'score' => (int) $attempt->score,
             'total_score' => (int) $attempt->total_score,
@@ -375,7 +334,7 @@ class QuizController extends Controller
                 ? round($attempt->score / $attempt->total_score * 100, 2)
                 : 0,
             'submitted_at' => $attempt->submitted_at?->toIso8601String(),
-            'review' => $review,
+            'review' => $attempt->setRelation('lesson', $lesson)->review(),
         ];
     }
 }

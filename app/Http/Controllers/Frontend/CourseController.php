@@ -72,6 +72,7 @@ class CourseController extends Controller
             'subCategory',
             'sections.lessons.questions',
         ])
+            ->withCount('enrollments')
             ->where('status', 'active')
             ->where('id', $id)
             ->firstOrFail();

@@ -90,6 +90,86 @@
         </div>
     </div>
 
+    {{-- Quiz performance in this course --}}
+    @if ($quizPerformance->isNotEmpty())
+    <div class="mt-12 pt-8 border-t border-slate-200" x-data="{ open: null }">
+        <div class="flex items-center gap-2 mb-1">
+            <span class="h-7 w-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-circle-question text-xs"></i>
+            </span>
+            <h3 class="text-lg font-bold text-brand-950">Quiz Performance</h3>
+            <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">{{ $quizPerformance->count() }}</span>
+        </div>
+        <p class="text-sm text-slate-500 mb-4 ml-9">How {{ $enrollment->user->name ?? 'this student' }} performed on each quiz in this course.</p>
+
+        <div class="space-y-3">
+            @foreach ($quizPerformance as $i => $qp)
+                @php $attempt = $qp['attempt']; @endphp
+                <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+                    <button type="button" @if ($attempt) @click="open = open === {{ $i }} ? null : {{ $i }}" @endif
+                        class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left {{ $attempt ? 'hover:bg-brand-50/30 cursor-pointer' : 'cursor-default' }} transition">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-brand-950 truncate">{{ $qp['lesson']->title }}</p>
+                            @if ($attempt)
+                                <p class="text-xs text-slate-400 mt-0.5">Submitted {{ $attempt->submitted_at?->format('D, d M Y · g:ia') }}</p>
+                            @else
+                                <p class="text-xs text-slate-400 mt-0.5">Not attempted yet</p>
+                            @endif
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            @if ($attempt)
+                                <x-admin.badge :color="$attempt->total_score > 0 && ($attempt->score / $attempt->total_score) >= 0.5 ? 'emerald' : 'rose'">
+                                    {{ $attempt->score }} / {{ $attempt->total_score }} pts
+                                </x-admin.badge>
+                                <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform" :class="open === {{ $i }} ? 'rotate-180' : ''"></i>
+                            @else
+                                <x-admin.badge color="slate">Not attempted</x-admin.badge>
+                            @endif
+                        </div>
+                    </button>
+
+                    @if ($attempt)
+                    <div x-show="open === {{ $i }}" x-cloak x-transition
+                        class="border-t border-slate-100 divide-y divide-slate-100">
+                        @foreach ($qp['review'] as $q)
+                            <div class="px-5 py-4">
+                                <p class="text-sm font-medium text-slate-800 mb-2">
+                                    {{ $loop->iteration }}. {{ $q['title'] }}
+                                    <span class="text-xs font-normal text-slate-400">({{ $q['type'] === 'multiple_choice' ? 'Multiple choice' : 'Single choice' }} · {{ $q['points'] }} {{ $q['points'] === 1 ? 'point' : 'points' }})</span>
+                                </p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach ($q['options'] as $idx => $opt)
+                                        @php
+                                            $isGiven = $q['type'] === 'multiple_choice'
+                                                ? in_array($idx, $q['given_answer'] ?? [])
+                                                : $q['given_answer'] === $idx;
+                                            $isCorrectOpt = in_array($idx, $q['correct_answers']);
+                                        @endphp
+                                        <span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border
+                                            {{ $isCorrectOpt ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : ($isGiven ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-slate-50 border-slate-200 text-slate-500') }}">
+                                            @if ($isCorrectOpt)
+                                                <i class="fa-solid fa-check text-[10px]"></i>
+                                            @elseif ($isGiven)
+                                                <i class="fa-solid fa-xmark text-[10px]"></i>
+                                            @endif
+                                            {{ $opt }}
+                                            @if ($isGiven)<span class="opacity-70">(their answer)</span>@endif
+                                        </span>
+                                    @endforeach
+                                    @if ($q['type'] === 'single_choice' && $q['given_answer'] === null)
+                                        <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium border bg-slate-50 border-slate-200 text-slate-400">Not answered</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Other courses this student is enrolled in --}}
     <div class="mt-12 pt-8 border-t border-slate-200">
         <div class="flex items-center gap-2 mb-1">
