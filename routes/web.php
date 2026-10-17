@@ -27,6 +27,8 @@ use App\Http\Controllers\Instructor\RevenueController as InstructorRevenueContro
 use App\Http\Controllers\Frontend\CourseController as FrontendCourseController;
 use App\Http\Controllers\Frontend\LessonProgressController;
 use App\Http\Controllers\Frontend\QuizController;
+use App\Http\Controllers\Admin\CertificateTemplateController;
+
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -299,7 +301,17 @@ Route::middleware('web.auth')->group(function () {
         MyCoursesController::class,
         'index',
     ])->name('my-courses.index');
+// Student Certificates
+Route::get('/my-certificates', [
+    \App\Http\Controllers\Frontend\UserCertificateController::class,
+    'index',
+])->name('user.certificates.index');
 
+Route::get('/my-certificates/{certificate}', [
+    \App\Http\Controllers\Frontend\UserCertificateController::class,
+    'show',
+])->whereNumber('certificate')
+  ->name('user.certificates.show');
     /*
     |--------------------------------------------------------------------------
     | Purchase History
@@ -400,6 +412,28 @@ Route::middleware(['web.auth', 'admin'])
             'index',
         ])->name('dashboard');
 
+
+
+Route::get('/certificates', [CertificateTemplateController::class, 'index'])
+    ->name('certificates.index');
+
+Route::get('/certificates/create', [CertificateTemplateController::class, 'create'])
+    ->name('certificates.create');
+
+Route::post('/certificates', [CertificateTemplateController::class, 'store'])
+    ->name('certificates.store');
+
+Route::get('/certificates/{certificateTemplate}', [CertificateTemplateController::class, 'show'])
+    ->name('certificates.show');
+
+Route::get('/certificates/{certificateTemplate}/edit', [CertificateTemplateController::class, 'edit'])
+    ->name('certificates.edit');
+
+Route::put('/certificates/{certificateTemplate}', [CertificateTemplateController::class, 'update'])
+    ->name('certificates.update');
+
+Route::delete('/certificates/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])
+    ->name('certificates.destroy');
         /*
         |--------------------------------------------------------------------------
         | Categories

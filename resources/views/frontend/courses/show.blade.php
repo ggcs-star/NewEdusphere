@@ -114,97 +114,93 @@
         return null;
     };
 
-/* Builds quiz questions using the actual questions table columns.
-   correct_answers stores zero-based option indexes, e.g. [0] or [0,1,2]. */
-$buildQuiz = function ($lesson) use ($pick, $readList): array {
-    $questions = $readList($lesson, ['questions', 'quizQuestions', 'quiz_questions']);
+    /* Builds quiz questions using the actual questions table columns.
+       correct_answers stores zero-based option indexes, e.g. [0] or [0,1,2]. */
+    $buildQuiz = function ($lesson) use ($pick, $readList): array {
+        $questions = $readList($lesson, ['questions', 'quizQuestions', 'quiz_questions']);
 
-    if ($questions === null) {
-        return [];
-    }
+        if ($questions === null) {
+            return [];
+        }
 
-    $out = [];
+        $out = [];
 
-    foreach (collect($questions)->sortBy('order')->values() as $question) {
-        $field = function (string $key, $default = null) use ($question, $pick) {
-            if (is_array($question)) {
-                return $question[$key] ?? $default;
+        foreach (collect($questions)->sortBy('order')->values() as $question) {
+            $field = function (string $key, $default = null) use ($question, $pick) {
+                if (is_array($question)) {
+                    return $question[$key] ?? $default;
+                }
+
+                return is_object($question)
+                    ? $pick($question, [$key], $default)
+                    : $default;
+            };
+
+            $text = trim(strip_tags((string) $field('title', '')));
+
+            $rawOptions = $field('options', []);
+
+            if (is_string($rawOptions)) {
+                $rawOptions = json_decode($rawOptions, true) ?? [];
             }
 
-            return is_object($question)
-                ? $pick($question, [$key], $default)
-                : $default;
-        };
+            if (!is_array($rawOptions)) {
+                continue;
+            }
 
-        $text = trim(strip_tags((string) $field('title', '')));
+            $options = array_values(array_map(
+                fn ($option) => trim(strip_tags((string) $option)),
+                $rawOptions
+            ));
 
-        $rawOptions = $field('options', []);
+            if ($text === '' || count($options) < 2) {
+                continue;
+            }
 
-        if (is_string($rawOptions)) {
-            $rawOptions = json_decode($rawOptions, true) ?? [];
-        }
+            $rawCorrect = $field('correct_answers', []);
 
-        if (!is_array($rawOptions)) {
-            continue;
-        }
+            if (is_string($rawCorrect)) {
+                $rawCorrect = json_decode($rawCorrect, true) ?? [];
+            }
 
-        $options = array_values(array_map(
-            fn ($option) => trim(strip_tags((string) $option)),
-            $rawOptions
-        ));
+            if (!is_array($rawCorrect)) {
+                $rawCorrect = [];
+            }
 
-        if ($text === '' || count($options) < 2) {
-            continue;
-        }
+            $correctIndexes = [];
 
-        $rawCorrect = $field('correct_answers', []);
+            foreach ($rawCorrect as $index) {
+                if (is_int($index) || (is_string($index) && ctype_digit($index))) {
+                    $index = (int) $index;
 
-        if (is_string($rawCorrect)) {
-            $rawCorrect = json_decode($rawCorrect, true) ?? [];
-        }
-
-        if (!is_array($rawCorrect)) {
-            $rawCorrect = [];
-        }
-
-        // Keep only valid zero-based indexes; do not guess 0-based vs 1-based.
-        $correctIndexes = [];
-
-        foreach ($rawCorrect as $index) {
-            if (
-                is_int($index) ||
-                (is_string($index) && ctype_digit($index))
-            ) {
-                $index = (int) $index;
-
-                if ($index >= 0 && $index < count($options)) {
-                    $correctIndexes[] = $index;
+                    if ($index >= 0 && $index < count($options)) {
+                        $correctIndexes[] = $index;
+                    }
                 }
             }
+
+            $correctIndexes = array_values(array_unique($correctIndexes));
+            sort($correctIndexes);
+
+            $type = (string) $field('type', 'single_choice');
+
+            $answer = $type === 'multiple_choice'
+                ? $correctIndexes
+                : ($correctIndexes[0] ?? -1);
+
+            $out[] = [
+                'id'   => (int) $field('id', 0),
+                'q'    => $text,
+                'opts' => $options,
+                'a'    => $answer,
+                'type' => $type,
+                'why'  => trim(strip_tags((string) $field('explanation', ''))),
+            'points' => max(1, (int) $field('points', 1)),
+            ];
         }
 
-        $correctIndexes = array_values(array_unique($correctIndexes));
-        sort($correctIndexes);
-
-        $type = (string) $field('type', 'single_choice');
-
-        // Single choice uses one index; multiple choice preserves all indexes.
-        $answer = $type === 'multiple_choice'
-            ? $correctIndexes
-            : ($correctIndexes[0] ?? -1);
-
-        $out[] = [
-            'q' => $text,
-            'opts' => $options,
-            'a' => $answer,
-            'type' => $type,
-            'why' => trim(strip_tags((string) $field('explanation', ''))),
-            'points' => max(1, (int) $field('points', 1)),
-        ];
-    }
-
-    return $out;
-};
+        return $out;
+    };
 
     /* Raw question data for the debug comment (only printed when APP_DEBUG=true) */
     $quizRaw = function ($lesson) use ($readList): array {
@@ -310,10 +306,8 @@ $buildQuiz = function ($lesson) use ($pick, $readList): array {
 
     // Access flags are supplied by CourseController. The first two lessons
     // across the whole course are free previews, even across different sections.
-$isCourseUnlocked = (bool) (
-    $isCourseUnlocked
-    ?? ($isFree || $isEnrolled)
-);    $courseLessonIndex = 0;
+    $isCourseUnlocked = (bool) ($isCourseUnlocked ?? ($isFree || $isEnrolled));
+    $courseLessonIndex = 0;
 
     $kindLabels = ['video' => 'Video lesson', 'document' => 'Document', 'quiz' => 'Quiz'];
 
@@ -339,10 +333,314 @@ $isCourseUnlocked = (bool) (
     $buyLabel = $isFree ? 'Enroll Now' : 'Buy Now';
 @endphp
 
+<style>
+/* =========================================================
+   Course details page
+   ========================================================= */
+.cd{
+    --cd-navy:#0f1b33; --cd-navy-2:#1a2b4f;
+    --cd-gold:#d6a84f; --cd-gold-d:#b98a33;
+    --cd-ink:#1b2333; --cd-muted:#667085; --cd-line:#e6e8ef; --cd-bg:#f5f6fa;
+    --cd-ok:#12a150; --cd-ok-bg:#e8f7ef; --cd-no:#d92d20; --cd-no-bg:#fdecea;
+    --cd-radius:16px;
+    background:var(--cd-bg); color:var(--cd-ink); line-height:1.55;
+    font-family:inherit; -webkit-font-smoothing:antialiased;
+}
+.cd *,.cd *::before,.cd *::after{box-sizing:border-box}
+.cd svg{width:1.1em;height:1.1em;flex:none;display:inline-block;vertical-align:-.18em}
+.cd a{color:inherit;text-decoration:none}
+.cd button{font-family:inherit;cursor:pointer}
+.cd-container{width:100%;max-width:1200px;margin:0 auto;padding:0 20px}
+.cd-lock{overflow:hidden}
+
+/* ---------- Hero ---------- */
+.cd-hero{background:linear-gradient(135deg,var(--cd-navy) 0%,var(--cd-navy-2) 100%);color:#fff;padding:36px 0 60px;position:relative;overflow:hidden}
+.cd-hero::after{content:"";position:absolute;right:-120px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(214,168,79,.22),transparent 70%);pointer-events:none}
+.cd-hero__copy{position:relative;z-index:1}
+.cd-crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:13px;color:rgba(255,255,255,.7);margin-bottom:16px}
+.cd-crumbs a:hover{color:var(--cd-gold)}
+.cd-crumbs .sep{opacity:.5}
+.cd-crumbs .current{color:#fff;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cd-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.cd-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.12);color:#fff}
+.cd-badge--gold{background:var(--cd-gold);color:#241a05}
+.cd-title{font-size:clamp(26px,4vw,40px);line-height:1.2;font-weight:800;margin:0 0 12px;letter-spacing:-.01em}
+.cd-lead{font-size:clamp(15px,1.6vw,17px);color:rgba(255,255,255,.82);margin:0 0 18px;max-width:760px}
+.cd-meta{list-style:none;display:flex;flex-wrap:wrap;gap:8px 20px;margin:0;padding:0;font-size:14px;color:rgba(255,255,255,.85)}
+.cd-meta li{display:inline-flex;align-items:center;gap:7px}
+.cd-meta .rate svg{color:var(--cd-gold)}
+
+/* ---------- Body / grid ---------- */
+.cd-body{padding-top:28px;padding-bottom:70px}
+.cd-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
+.cd-main{display:grid;gap:22px;min-width:0}
+.cd-side{order:-1;min-width:0}
+
+@media (min-width:1024px){
+    .cd-grid:not(.cd-grid--full){grid-template-columns:minmax(0,1fr) 380px;gap:32px}
+    .cd-side{order:0;position:sticky;top:90px;margin-top:-210px;z-index:5}
+    .cd-hero--wide .cd-hero__copy{max-width:calc(100% - 430px)}
+}
+
+/* ---------- Alerts ---------- */
+.cd-alert{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:12px;margin-bottom:18px;font-size:14.5px;border:1px solid}
+.cd-alert ul{margin:0;padding-left:18px}
+.cd-alert svg{margin-top:3px;width:1.25em;height:1.25em}
+.cd-alert--success{background:var(--cd-ok-bg);border-color:#b7e4c9;color:#0b6b36}
+.cd-alert--error{background:var(--cd-no-bg);border-color:#f5c2bd;color:#a3231a}
+
+/* ---------- Panels ---------- */
+.cd-panel{background:#fff;border:1px solid var(--cd-line);border-radius:var(--cd-radius);padding:24px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.cd-h2{font-size:20px;font-weight:800;margin:0 0 16px;letter-spacing:-.01em}
+.cd-js .cd-reveal{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+.cd-js .cd-reveal.is-in{opacity:1;transform:none}
+
+.cd-checks{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
+.cd-checks--single{grid-template-columns:minmax(0,1fr)}
+.cd-checks li{display:flex;gap:10px;align-items:flex-start;font-size:15px}
+.cd-checks .tick{flex:none;width:22px;height:22px;border-radius:50%;background:var(--cd-ok-bg);color:var(--cd-ok);display:grid;place-items:center;margin-top:1px}
+.cd-checks .tick svg{width:13px;height:13px;stroke-width:3}
+@media (max-width:700px){.cd-checks{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- Curriculum ---------- */
+.cd-cur__head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+.cd-cur__head .cd-h2{margin:0}
+.cd-cur__stats{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;font-size:13.5px;color:var(--cd-muted)}
+.cd-link-btn{background:none;border:0;padding:0;color:var(--cd-gold-d);font-weight:700;font-size:13.5px}
+.cd-link-btn:hover{text-decoration:underline}
+.cd-empty{padding:22px;border:1px dashed var(--cd-line);border-radius:12px;color:var(--cd-muted);text-align:center;font-size:14.5px}
+.cd-sections{display:grid;gap:10px}
+.cd-sec{border:1px solid var(--cd-line);border-radius:12px;background:#fff;overflow:hidden}
+.cd-sec[open]{border-color:#d9dcE6}
+.cd-sec__head{list-style:none;display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;background:#fafbfd;user-select:none}
+.cd-sec__head::-webkit-details-marker{display:none}
+.cd-sec__head:hover{background:#f3f5fa}
+.cd-sec__chev{display:grid;place-items:center;transition:transform .25s ease;color:var(--cd-muted)}
+.cd-sec[open]:not(.is-closing) .cd-sec__chev{transform:rotate(180deg)}
+.cd-sec__name{flex:1;font-weight:700;font-size:15px;min-width:0}
+.cd-sec__count{font-size:12.5px;color:var(--cd-muted);white-space:nowrap}
+.cd-sec__body{overflow:hidden;border-top:1px solid var(--cd-line)}
+
+.cd-lesson{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid var(--cd-line);padding:13px 16px;color:inherit;transition:background .15s}
+.cd-sec__body > .cd-lesson:last-child{border-bottom:0}
+.cd-lesson:hover{background:#fbf6ea}
+.cd-lesson:focus-visible{outline:2px solid var(--cd-gold);outline-offset:-2px}
+.cd-lesson.is-active{background:#fbf3de}
+.cd-lesson__icon{flex:none;width:36px;height:36px;border-radius:10px;background:#fbf0d6;color:var(--cd-gold-d);display:grid;place-items:center}
+.cd-lesson__icon svg{width:16px;height:16px}
+.cd-lesson[data-locked="1"] .cd-lesson__icon{background:#eef0f5;color:#8a93a6}
+.cd-lesson__text{flex:1;min-width:0;display:grid;gap:2px}
+.cd-lesson__title{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis}
+.cd-lesson__sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12.5px;color:var(--cd-muted)}
+.cd-lesson__sub span{display:inline-flex;align-items:center;gap:4px}
+.cd-lesson__time{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--cd-muted)}
+.cd-preview-badge,.cd-locked-badge{padding:1px 8px;border-radius:99px;font-weight:700;font-size:11.5px}
+.cd-preview-badge{background:var(--cd-ok-bg);color:#0b6b36}
+.cd-locked-badge{background:#eef0f5;color:#667085}
+.cd-lesson--empty{color:var(--cd-muted);cursor:default;font-size:14px}
+.cd-lesson--empty:hover{background:#fff}
+
+/* ---------- Prose / instructor ---------- */
+.cd-prose{font-size:15.5px;overflow-wrap:anywhere}
+.cd-prose img,.cd-prose iframe,.cd-prose video{max-width:100%;height:auto;border-radius:10px}
+.cd-prose h1,.cd-prose h2,.cd-prose h3,.cd-prose h4{margin:1.2em 0 .5em;line-height:1.3}
+.cd-prose p{margin:0 0 1em}
+.cd-prose ul,.cd-prose ol{padding-left:22px;margin:0 0 1em}
+.cd-inst{display:flex;gap:16px;align-items:flex-start}
+.cd-inst__avatar{flex:none;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--cd-gold),#f0cf86);color:#241a05;font-weight:800;font-size:26px;display:grid;place-items:center}
+.cd-inst__name{font-weight:800;font-size:17px}
+.cd-inst__role{font-size:13.5px;color:var(--cd-muted)}
+.cd-inst__bio{margin:10px 0 0;font-size:14.5px;color:#3b4457}
+
+/* ---------- Purchase card ---------- */
+.cd-card{background:#fff;border:1px solid var(--cd-line);border-radius:var(--cd-radius);overflow:hidden;box-shadow:0 18px 40px -18px rgba(16,24,40,.35)}
+.cd-card__body{padding:20px}
+.cd-card__ph{display:grid;place-items:center;gap:8px;color:rgba(255,255,255,.7);font-size:14px;text-align:center}
+.cd-card__ph svg{width:34px;height:34px}
+.cd-price{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;margin-bottom:16px}
+.cd-price__now{font-size:32px;font-weight:800;letter-spacing:-.02em}
+.cd-price__now.is-free{color:var(--cd-ok)}
+.cd-price__old{color:var(--cd-muted);text-decoration:line-through;font-size:16px}
+.cd-price__off{background:var(--cd-no-bg);color:var(--cd-no);font-weight:700;font-size:12.5px;padding:3px 9px;border-radius:99px}
+.cd-actions{display:grid;gap:10px}
+.cd-actions form{margin:0}
+.cd-includes{margin-top:20px;padding-top:18px;border-top:1px solid var(--cd-line)}
+.cd-includes h4{margin:0 0 10px;font-size:15px}
+.cd-includes ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14px;color:#3b4457}
+.cd-includes li{display:flex;align-items:center;gap:10px}
+.cd-includes li svg{color:var(--cd-gold-d)}
+
+/* ---------- Buttons ---------- */
+.cd-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 18px;border-radius:12px;border:2px solid transparent;font-weight:700;font-size:15px;line-height:1.2;transition:transform .15s,box-shadow .15s,background .15s,border-color .15s,color .15s}
+.cd-btn:active{transform:translateY(1px)}
+.cd-btn:disabled{opacity:.6;cursor:not-allowed}
+.cd-btn--gold{background:var(--cd-gold);color:#241a05;box-shadow:0 6px 16px -6px rgba(214,168,79,.8)}
+.cd-btn--gold:hover:not(:disabled){background:#e0b560}
+.cd-btn--outline{background:#fff;color:var(--cd-ink);border-color:var(--cd-line)}
+.cd-btn--outline:hover:not(:disabled){border-color:var(--cd-gold);color:var(--cd-gold-d)}
+.cd-btn--success{background:var(--cd-ok-bg);color:#0b6b36;border-color:#b7e4c9}
+.cd-btn--sm{width:auto;padding:9px 14px;font-size:13.5px;border-radius:10px}
+.cd-btn:focus-visible,.cd-nav:focus-visible,.cd-dialog__close:focus-visible,.cd-opt:focus-visible{outline:3px solid rgba(214,168,79,.55);outline-offset:2px}
+
+/* ---------- Screen (video / document / quiz area) ---------- */
+.cd-screen{position:relative;width:100%;aspect-ratio:16/9;background:#0b1224;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cd-screen > iframe,.cd-screen > video,.cd-screen > img{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:cover;background:#000}
+.cd-screen > video{object-fit:contain}
+.cd-screen--document{aspect-ratio:auto;height:min(68vh,640px);background:#eef0f5}
+.cd-screen--quiz{aspect-ratio:auto;min-height:340px;background:#fff;display:block;overflow:visible}
+.cd-screen__note{color:rgba(255,255,255,.85);text-align:center;padding:24px;margin:0;font-size:14.5px}
+.cd-loader{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--cd-gold);animation:cdSpin .8s linear infinite}
+@keyframes cdSpin{to{transform:rotate(360deg)}}
+
+/* ---------- Sticky buy bar ---------- */
+.cd-bar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;align-items:center;gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--cd-line);box-shadow:0 -8px 24px -12px rgba(16,24,40,.3);transform:translateY(110%);transition:transform .3s ease}
+.cd-bar.is-visible{transform:none}
+.cd-bar form{margin:0}
+.cd-bar form:last-child{flex:1}
+.cd-bar__price{display:grid;line-height:1.15;margin-right:auto}
+.cd-bar__price strong{font-size:19px}
+.cd-bar__price s{font-size:12.5px;color:var(--cd-muted)}
+.cd-bar .cd-btn{padding:11px 16px}
+@media (min-width:1024px){.cd-bar{display:none}}
+
+/* ---------- Lesson popup ---------- */
+.cd-modal{position:fixed;inset:0;z-index:1050;display:flex;align-items:center;justify-content:center;padding:20px}
+.cd-modal[hidden]{display:none}
+.cd-modal__backdrop{position:absolute;inset:0;background:rgba(9,14,28,.72);backdrop-filter:blur(4px);opacity:0;transition:opacity .35s ease}
+.cd-modal.is-open .cd-modal__backdrop{opacity:1}
+.cd-dialog{position:relative;width:min(980px,100%);max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);display:flex;flex-direction:column;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 40px 90px -20px rgba(0,0,0,.6);outline:0;opacity:0;transform:translateY(26px) scale(.98);transition:opacity .35s ease,transform .38s cubic-bezier(.2,.8,.2,1)}
+.cd-modal.is-open .cd-dialog{opacity:1;transform:none}
+.cd-dialog__grip{display:none;width:44px;height:5px;border-radius:99px;background:#d0d5dd;margin:10px auto 0;flex:none}
+.cd-dialog__head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;border-bottom:1px solid var(--cd-line)}
+.cd-dialog__titles{min-width:0}
+.cd-dialog__tag{display:inline-block;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--cd-gold-d)}
+.cd-dialog__title{margin:2px 0 0;font-size:18px;font-weight:800;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.cd-dialog__close{flex:none;width:40px;height:40px;border-radius:50%;border:0;background:#f1f3f8;color:var(--cd-ink);display:grid;place-items:center;transition:background .15s,transform .15s}
+.cd-dialog__close:hover{background:#e4e7ef;transform:rotate(90deg)}
+.cd-dialog__scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.cd-dialog__info{padding:18px 22px 20px;display:grid;gap:14px}
+.cd-dialog__info:empty{display:none}
+.cd-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cd-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;background:#f1f3f8;color:#3b4457;font-size:12.5px;font-weight:600}
+.cd-chip--best{background:#fbf0d6;color:#7a5712}
+.cd-chip[hidden]{display:none}
+.cd-dialog__summary{background:#fafbfd;border:1px solid var(--cd-line);border-radius:12px;padding:14px 16px}
+.cd-dialog__summary h4{margin:0 0 6px;font-size:14.5px}
+.cd-dialog__summary p{margin:0;font-size:14.5px;color:#3b4457;white-space:pre-line}
+.cd-info-actions{display:flex;flex-wrap:wrap;gap:10px}
+
+.cd-progress{padding:0 22px 18px}
+.cd-progress[hidden]{display:none}
+.cd-progress__row{display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:7px}
+.cd-progress__track{height:6px;background:#e8eaf0;border-radius:99px;overflow:hidden}
+.cd-progress__fill{height:100%;width:0;background:var(--cd-gold);border-radius:99px;transition:width .25s ease}
+.cd-progress__time{display:block;margin-top:6px;color:var(--cd-muted);font-size:12.5px}
+.cd-cert-note{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--cd-ok-bg);color:#0b6b36;font-size:14px;font-weight:600}
+.cd-cert-note a{margin-left:6px;color:inherit;text-decoration:underline}
+.cd-cert-note--err{background:var(--cd-no-bg);color:#a3231a}
+.cd-cert-note--info{background:#f1f3f8;color:#3b4457}
+.cd-cert-note{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+.cd-cert-btn{display:inline-block;padding:9px 18px;border-radius:10px;background:var(--cd-gold);color:#1b1b1b;font-weight:700;text-decoration:none!important;margin-left:0!important}
+
+.cd-dialog__foot{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 20px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--cd-line);background:#fff}
+.cd-dialog__count{font-size:13px;color:var(--cd-muted);text-align:center}
+.cd-nav{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:2px solid var(--cd-line);background:#fff;font-weight:700;font-size:14px;color:var(--cd-ink);transition:border-color .15s,background .15s}
+.cd-nav:hover:not(:disabled){border-color:var(--cd-gold)}
+.cd-nav:disabled{opacity:.4;cursor:not-allowed}
+.cd-nav--next{background:var(--cd-gold);border-color:var(--cd-gold);color:#241a05}
+.cd-nav--next:hover:not(:disabled){background:#e0b560;border-color:#e0b560}
+
+@media (max-width:640px){
+    .cd-container{padding:0 16px}
+    .cd-panel{padding:18px}
+    .cd-modal{padding:0;align-items:flex-end}
+    .cd-dialog{width:100%;max-height:94vh;max-height:94dvh;height:94vh;height:94dvh;border-radius:22px 22px 0 0;transform:translateY(100%);opacity:1}
+    .cd-dialog__grip{display:block}
+    .cd-dialog__head{padding:10px 16px 12px}
+    .cd-dialog__title{font-size:16px}
+    .cd-dialog__info{padding:16px}
+    .cd-progress{padding:0 16px 16px}
+    .cd-dialog__foot{padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+    .cd-nav{padding:10px 12px}
+    .cd-nav span{font-size:13px}
+    .cd-screen--document{height:62vh}
+    .cd-lesson__time{display:none}
+}
+
+/* ---------- Quiz ---------- */
+.cd-quiz{padding:24px 22px 26px;max-width:760px;margin:0 auto;color:var(--cd-ink)}
+.cd-quiz__top{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--cd-muted);margin-bottom:8px}
+.cd-quiz__score{color:var(--cd-gold-d)}
+.cd-quiz__bar{height:6px;background:#e8eaf0;border-radius:99px;overflow:hidden;margin-bottom:20px}
+.cd-quiz__bar span{display:block;height:100%;width:0;background:var(--cd-gold);border-radius:99px;transition:width .5s ease}
+.cd-quiz__q{margin:0 0 8px;font-size:19px;line-height:1.4;font-weight:800;outline:0}
+.cd-quiz__hint{margin:0 0 14px;font-size:13px;color:var(--cd-muted)}
+.cd-quiz__opts{display:grid;gap:10px;margin-top:16px}
+.cd-quiz__hint + .cd-quiz__opts{margin-top:0}
+.cd-opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 14px;border-radius:12px;border:2px solid var(--cd-line);background:#fff;color:var(--cd-ink);font-size:15px;transition:border-color .15s,background .15s,transform .15s;animation:cdIn .35s both}
+@keyframes cdIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.cd-opt:hover:not(:disabled){border-color:var(--cd-gold);background:#fffaf0;transform:translateX(2px)}
+.cd-opt:disabled{cursor:default}
+.cd-opt__key{flex:none;width:30px;height:30px;border-radius:8px;background:#f1f3f8;display:grid;place-items:center;font-weight:800;font-size:13px}
+.cd-opt__text{flex:1;min-width:0;overflow-wrap:anywhere}
+.cd-opt__mark{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;opacity:0;color:#fff}
+.cd-opt__mark svg{width:14px;height:14px;stroke-width:3}
+.cd-opt.is-selected{border-color:var(--cd-gold);background:#fffaf0}
+.cd-opt.is-selected .cd-opt__key{background:var(--cd-gold);color:#241a05}
+.cd-opt.is-correct{border-color:var(--cd-ok);background:var(--cd-ok-bg)}
+.cd-opt.is-correct .cd-opt__key{background:var(--cd-ok);color:#fff}
+.cd-opt.is-correct .cd-opt__mark{opacity:1;background:var(--cd-ok)}
+.cd-opt.is-wrong{border-color:var(--cd-no);background:var(--cd-no-bg)}
+.cd-opt.is-wrong .cd-opt__key{background:var(--cd-no);color:#fff}
+.cd-opt.is-wrong .cd-opt__mark{opacity:1;background:var(--cd-no)}
+.cd-opt.is-picked{border-color:var(--cd-gold);background:#fffaf0}
+.cd-opt.is-dim{opacity:.55}
+.cd-quiz__fb{margin-top:16px;padding:13px 15px;border-radius:12px;font-size:14.5px;animation:cdIn .3s both}
+.cd-quiz__fb strong{display:block;margin-bottom:2px}
+.cd-quiz__fb--ok{background:var(--cd-ok-bg);color:#0b6b36}
+.cd-quiz__fb--no{background:var(--cd-no-bg);color:#a3231a}
+.cd-quiz__fb--neutral{background:#f1f3f8;color:#3b4457}
+.cd-quiz__foot{display:flex;justify-content:flex-end;margin-top:16px}
+.cd-quiz__foot .cd-btn{width:auto;min-width:170px}
+.cd-quiz__empty{padding:48px 24px;text-align:center;color:var(--cd-muted)}
+.cd-quiz__empty svg{width:42px;height:42px;color:var(--cd-gold-d)}
+.cd-quiz__empty h4{margin:12px 0 4px;color:var(--cd-ink);font-size:17px}
+.cd-quiz__empty p{margin:0}
+
+.cd-result{text-align:center;padding:8px 0}
+.cd-ring{position:relative;width:140px;height:140px;margin:0 auto 14px}
+.cd-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.cd-ring .track{fill:none;stroke:#e8eaf0;stroke-width:10}
+.cd-ring .bar{fill:none;stroke:var(--cd-gold);stroke-width:10;stroke-linecap:round;stroke-dasharray:327;stroke-dashoffset:327;transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)}
+.cd-ring.is-good .bar{stroke:var(--cd-ok)}
+.cd-ring.is-low .bar{stroke:var(--cd-no)}
+.cd-ring__num{position:absolute;inset:0;display:grid;place-items:center;font-size:30px;font-weight:800}
+.cd-result h4{margin:0 0 4px;font-size:22px;font-weight:800}
+.cd-result p{margin:0 0 18px;color:var(--cd-muted)}
+.cd-result__actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.cd-review{margin-top:22px;display:grid;gap:10px;text-align:left}
+.cd-review[hidden]{display:none}
+.cd-review__item{display:grid;gap:3px;padding:12px 14px;border-radius:12px;border:1px solid var(--cd-line);background:#fafbfd;font-size:14px;animation:cdIn .3s both}
+.cd-review__item.ok{border-color:#b7e4c9;background:var(--cd-ok-bg)}
+.cd-review__item.no{border-color:#f5c2bd;background:var(--cd-no-bg)}
+.cd-review__item .good{color:#0b6b36}
+.cd-review__item .bad{color:#a3231a}
+
+@media (max-width:640px){
+    .cd-quiz{padding:18px 14px 22px}
+    .cd-quiz__q{font-size:17px}
+    .cd-quiz__foot .cd-btn{width:100%}
+}
+
+@media (prefers-reduced-motion:reduce){
+    .cd *,.cd *::before,.cd *::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+
 <main class="cd">
 
     {{-- ===================== Hero ===================== --}}
-    <section class="cd-hero">
+    <section class="cd-hero {{ $isEnrolled ? '' : 'cd-hero--wide' }}">
         <div class="cd-container">
             <div class="cd-hero__copy">
                 <nav class="cd-crumbs" aria-label="Breadcrumb">
@@ -400,7 +698,7 @@ $isCourseUnlocked = (bool) (
             </div>
         @endif
 
-        <div class="cd-grid">
+        <div class="cd-grid {{ $isEnrolled ? 'cd-grid--full' : '' }}">
 
             {{-- ---------- Main column ---------- --}}
             <div class="cd-main">
@@ -493,9 +791,10 @@ $isCourseUnlocked = (bool) (
                                                     data-qcount="{{ $quizCount }}"
                                                     data-quiz-show-url="{{ route('courses.quizzes.show', [(int) $course->id, (int) $lesson->id]) }}"
                                                     data-quiz-submit-url="{{ route('courses.quizzes.submit', [(int) $course->id, (int) $lesson->id]) }}"
-                                                @endif
+                                                @if (\Illuminate\Support\Facades\Route::has('courses.quizzes.submit')) data-quiz-submit="{{ route('courses.quizzes.submit', [(int) $course->id, (int) $attr($lesson, 'id', 0)]) }}" @endif @endif
+                                                @if (\Illuminate\Support\Facades\Route::has('user.certificates.index')) data-certificates-url="{{ route('user.certificates.index') }}" @endif
                                             >
-                                                <span class="cd-lesson__icon">{!! $canAccessLesson ? $icons[$kindIcon] : $icons['lock'] ?? $icons['alert'] !!}</span>
+                                                <span class="cd-lesson__icon">{!! $canAccessLesson ? $icons[$kindIcon] : $icons['lock'] !!}</span>
                                                 <span class="cd-lesson__text">
                                                     <span class="cd-lesson__title">{{ $lTitle }}</span>
                                                     <span class="cd-lesson__sub">
@@ -715,12 +1014,14 @@ $isCourseUnlocked = (bool) (
 
             <div class="cd-dialog__scroll">
                 <div class="cd-screen" id="cdModalScreen"></div>
-                <div class="cd-dialog__info" id="cdModalInfo"></div>
-                <div class="cd-progress-wrap" id="cdLessonProgress" hidden style="padding:0 22px 18px">
-                    <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:7px"><span>Lesson progress</span><strong id="cdProgressText">0%</strong></div>
-                    <div style="height:6px;background:#e8eaf0;border-radius:99px;overflow:hidden"><div id="cdProgressFill" style="height:100%;width:0;background:#d6a84f;transition:width .2s"></div></div>
-                    <small id="cdProgressTime" style="display:block;margin-top:6px;color:#667085"></small>
+
+                <div class="cd-progress" id="cdLessonProgress" hidden>
+                    <div class="cd-progress__row"><span>Lesson progress</span><strong id="cdProgressText">0%</strong></div>
+                    <div class="cd-progress__track"><div class="cd-progress__fill" id="cdProgressFill"></div></div>
+                    <small class="cd-progress__time" id="cdProgressTime"></small>
                 </div>
+
+                <div class="cd-dialog__info" id="cdModalInfo"></div>
             </div>
 
             <footer class="cd-dialog__foot">
@@ -740,7 +1041,6 @@ $isCourseUnlocked = (bool) (
     document.documentElement.classList.add('cd-js');
 
     // Always start with every curriculum section collapsed on page load.
-    // This also overrides any stale open state from cached/previous markup.
     root.querySelectorAll('.cd-sec').forEach(function (section) {
         section.removeAttribute('open');
         section.open = false;
@@ -860,9 +1160,12 @@ $isCourseUnlocked = (bool) (
     var scroller = modal.querySelector('.cd-dialog__scroll');
 
     var lessons = Array.prototype.slice.call(root.querySelectorAll('.cd-lesson[data-kind]'));
+    var accessibleTotal = lessons.filter(function (b) { return b.dataset.locked !== '1'; }).length;
     var current = -1;
     var lastFocus = null;
     var closeTimer = null;
+
+    function isLocked(i) { return !!lessons[i] && lessons[i].dataset.locked === '1'; }
 
     function el(tagName, className, text) {
         var n = document.createElement(tagName);
@@ -885,15 +1188,17 @@ $isCourseUnlocked = (bool) (
         screen.appendChild(p);
     }
 
-    // Persistent lesson progress (YouTube IFrame API + native video element).
+    /* ---------- Persistent lesson progress ---------- */
     var activeProgress = null;       // {lessonId, showUrl, saveUrl, token, completed, disabled}
     var progressTimer = null;
     var youtubePlayer = null;
-    var youtubePlayerReady = false;  // true only after the saved position was restored
-    var activeVideo = null;          // {el, ready} for uploaded videos
-    var progressToken = 0;           // changes on every lesson open/close; stale async work is ignored
+    var youtubePlayerReady = false;
+    var vimeoPlayer = null;
+    var activeVideo = null;
+    var vimeoApiPromise = null;
+    var progressToken = 0;
     var docToken = 0;                // changes on every document render; stale fetch checks are ignored
-    var youtubeApiState = 'idle';    // idle | loading
+    var youtubeApiState = 'idle';
     var youtubeApiWaiters = [];
     var progressShow = document.getElementById('cdLessonProgress');
     var progressText = document.getElementById('cdProgressText');
@@ -906,7 +1211,15 @@ $isCourseUnlocked = (bool) (
         return h ? h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') : m + ':' + String(s).padStart(2, '0');
     }
     function progressUrl(template, lessonId) { return String(template || '').replace('__LESSON_ID__', encodeURIComponent(lessonId)); }
-    function progressHeaders() { return {'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || (lessons[current] ? lessons[current].dataset.csrf : '')}; }
+    function progressHeaders() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        return {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': (meta && meta.content) || (lessons[current] ? lessons[current].dataset.csrf : '')
+        };
+    }
+    function hideProgress() { if (progressShow) progressShow.hidden = true; }
     function updateProgressUI(position, duration, completed) {
         if (!progressShow) return;
         progressShow.hidden = false;
@@ -921,7 +1234,6 @@ $isCourseUnlocked = (bool) (
         return !!activeProgress && activeProgress.token === token;
     }
 
-    // Controller returns {position, duration, completed}; also accept DB column names.
     function normalizeProgress(p) {
         p = p || {};
         var pos = p.position !== undefined ? p.position : (p.last_position_seconds !== undefined ? p.last_position_seconds : p.position_seconds);
@@ -944,55 +1256,116 @@ $isCourseUnlocked = (bool) (
             })
             .then(function (d) { return normalizeProgress(d && d.progress ? d.progress : d); })
             .catch(function (error) {
-                console.error('Could not fetch lesson progress:', url, error);
+                console.warn('Could not fetch lesson progress:', url, error);
                 return null;
             });
     }
 
-    function saveProgress(position, duration, completed) {
-        if (!activeProgress || !activeProgress.saveUrl || !activeProgress.lessonId) {
-            console.error('Progress URL or lesson ID missing:', activeProgress);
-            return;
+
+
+    /* Shows the certificate result: a "View Certificate" button once issued. */
+    function showCertificateNotice(status, message, certUrl, fallbackUrl) {
+        if (['issued', 'already_issued', 'incomplete', 'error'].indexOf(status) === -1) return;
+        var host = progressShow && !progressShow.hidden ? progressShow : info;
+        if (!host) return;
+        var old = host.querySelector('.cd-cert-note');
+        if (old) old.remove();
+        var ok = status === 'issued' || status === 'already_issued';
+        var note = document.createElement('div');
+        note.className = 'cd-cert-note' + (status === 'error' ? ' cd-cert-note--err' : (status === 'incomplete' ? ' cd-cert-note--info' : ''));
+        var text = document.createElement('span');
+        text.textContent = status === 'issued'
+            ? '\uD83C\uDFC6 Congratulations! Your certificate is ready.'
+            : (status === 'already_issued' ? '\uD83C\uDFC6 Your certificate is ready.' : (message || ''));
+        note.appendChild(text);
+        var href = certUrl || (ok ? fallbackUrl : '');
+        if (ok && href) {
+            var a = document.createElement('a');
+            a.href = href;
+            a.className = 'cd-cert-btn';
+            a.textContent = 'View Certificate';
+            note.appendChild(a);
         }
-        if (activeProgress.disabled) return;
-
-        position = Math.max(0, Math.floor(Number(position) || 0));
-        duration = Math.max(0, Math.floor(Number(duration) || 0));
-
-        // Unknown duration: never send (server would clamp the position to 0).
-        if (duration <= 0) return;
-        position = Math.min(position, duration);
-
-        if (completed) activeProgress.completed = true;
-        updateProgressUI(position, duration, activeProgress.completed);
-
-        var url = activeProgress.saveUrl;
-
-        fetch(url, {
-            method: 'POST',
-            headers: progressHeaders(),
-            body: JSON.stringify({position: position, duration: duration, completed: !!completed}),
-            credentials: 'same-origin',
-            keepalive: true
-        })
-        .then(function (response) {
-            return response.text().then(function (text) {
-                var data;
-                try { data = JSON.parse(text); } catch (e) { data = {message: text}; }
-
-                if (!response.ok) {
-                    console.error('Progress save failed:', response.status, data);
-                    return;
-                }
-                console.debug('Progress saved:', data);
-            });
-        })
-        .catch(function (error) {
-            console.error('Progress request error:', url, error);
-        });
+        host.appendChild(note);
+    }
+    function certificatesUrl() {
+        return (lessons[current] && lessons[current].dataset.certificatesUrl) || '';
     }
 
-    // Save the current playback position (YouTube or uploaded video).
+function saveProgress(position, duration, completed) {
+    if (
+        !activeProgress ||
+        !activeProgress.saveUrl ||
+        !activeProgress.lessonId ||
+        activeProgress.disabled
+    ) {
+        return Promise.resolve(null);
+    }
+
+    position = Math.max(0, Math.floor(Number(position) || 0));
+    duration = Math.max(0, Math.floor(Number(duration) || 0));
+
+    if (duration <= 0) {
+        return Promise.resolve(null);
+    }
+
+    position = Math.min(position, duration);
+
+    // Capture these before the asynchronous request starts.
+    var token = activeProgress.token;
+    var url = activeProgress.saveUrl;
+
+    return fetch(url, {
+        method: 'POST',
+        headers: progressHeaders(),
+        body: JSON.stringify({
+            position: position,
+            duration: duration
+        }),
+        credentials: 'same-origin',
+        keepalive: true
+    })
+    .then(function (response) {
+        return response.json().catch(function () {
+            return {};
+        }).then(function (data) {
+            if (!response.ok) {
+                console.warn(
+                    'Progress save failed:',
+                    response.status,
+                    data
+                );
+                return null;
+            }
+
+            // Do not update a different lesson after navigation.
+            if (!isCurrentProgress(token)) {
+                return data;
+            }
+
+            activeProgress.completed = !!data.completed;
+            showCertificateNotice(data.certificate_status, data.certificate_message, data.certificate_url, certificatesUrl());
+
+            // Documents have no playback, so no progress bar for them.
+            if (!lessons[current] || lessons[current].dataset.kind !== 'document') {
+                updateProgressUI(
+                    Number(data.position) || position,
+                    Number(data.duration) || duration,
+                    !!data.completed
+                );
+            }
+
+            return data;
+        });
+    })
+    .catch(function (error) {
+        console.warn('Progress request error:', url, error);
+        return null;
+    });
+}
+
+
+
     function flushProgress() {
         if (!activeProgress) return;
         try {
@@ -1002,20 +1375,23 @@ $isCourseUnlocked = (bool) (
                 saveProgress(activeVideo.el.currentTime, activeVideo.el.duration, false);
             }
         } catch (e) {
-            console.error('Could not save progress before leaving the lesson:', e);
+            console.warn('Could not save progress before leaving the lesson:', e);
         }
     }
 
-    // Stop tracking the current lesson: optionally save, clear timer, destroy player.
     function stopProgress(shouldSave) {
         if (shouldSave) flushProgress();
         clearInterval(progressTimer);
         progressTimer = null;
         if (youtubePlayer) {
-            try { youtubePlayer.destroy(); } catch (e) { console.error('Could not destroy YouTube player:', e); }
+            try { youtubePlayer.destroy(); } catch (e) { /* ignore */ }
+        }
+        if (vimeoPlayer) {
+            try { vimeoPlayer.destroy(); } catch (e) { /* ignore */ }
         }
         youtubePlayer = null;
         youtubePlayerReady = false;
+        vimeoPlayer = null;
         activeVideo = null;
         progressToken++;
         activeProgress = null;
@@ -1036,17 +1412,14 @@ $isCourseUnlocked = (bool) (
             disabled: false
         } : null;
 
-        if (progressShow) progressShow.hidden = !(activeProgress && data.id);
-        if (progressText) progressText.textContent = '0%';
-        if (progressFill) progressFill.style.width = '0%';
-        if (progressTime) progressTime.textContent = 'Loading saved progress…';
+        hideProgress();
 
-        // The saved position is fetched exactly once per lesson-opening flow.
         return fetchProgress().then(function (saved) {
-            if (!isCurrentProgress(token)) return null;   // lesson changed/closed while loading
+            if (!isCurrentProgress(token)) return null;
             if (!saved) {
-                activeProgress.disabled = true;           // never overwrite unknown saved progress
-                if (progressTime) progressTime.textContent = 'Saved progress could not be loaded. Tracking is paused for this lesson.';
+                // Guests / failed request: never overwrite unknown progress, hide the panel quietly.
+                activeProgress.disabled = true;
+                hideProgress();
                 return null;
             }
             activeProgress.completed = saved.completed;
@@ -1055,10 +1428,7 @@ $isCourseUnlocked = (bool) (
     }
 
     function loadYouTubeApi(callback) {
-        if (window.YT && window.YT.Player) {
-            callback();
-            return;
-        }
+        if (window.YT && window.YT.Player) { callback(); return; }
 
         youtubeApiWaiters.push(callback);
         if (youtubeApiState === 'loading') return;
@@ -1067,11 +1437,11 @@ $isCourseUnlocked = (bool) (
         var previousReady = window.onYouTubeIframeAPIReady;
         window.onYouTubeIframeAPIReady = function () {
             if (typeof previousReady === 'function') {
-                try { previousReady(); } catch (e) { console.error('Previous YouTube API ready handler failed:', e); }
+                try { previousReady(); } catch (e) { /* ignore */ }
             }
             youtubeApiState = 'idle';
             youtubeApiWaiters.splice(0).forEach(function (fn) {
-                try { fn(); } catch (e) { console.error('YouTube API callback failed:', e); }
+                try { fn(); } catch (e) { console.warn('YouTube API callback failed:', e); }
             });
         };
 
@@ -1081,171 +1451,579 @@ $isCourseUnlocked = (bool) (
         script.onerror = function () {
             youtubeApiState = 'idle';
             youtubeApiWaiters.length = 0;
-            console.error('Failed to load the YouTube IFrame API.');
+            console.warn('Failed to load the YouTube IFrame API.');
         };
         document.head.appendChild(script);
     }
 
-    function startYouTubeProgress(iframe, saved, token) {
-        loadYouTubeApi(function () {
-            if (!isCurrentProgress(token) || !iframe || !iframe.isConnected) return;
 
-            try {
-                youtubePlayer = new YT.Player(iframe, {
-                    events: {
-                        onReady: function (event) {
-                            if (!isCurrentProgress(token)) return;
+function startYouTubeProgress(iframe, saved, token) {
+    loadYouTubeApi(function () {
+        if (!isCurrentProgress(token) || !iframe || !iframe.isConnected) {
+            return;
+        }
 
-                            var player = event.target;
-                            var duration = Math.floor(player.getDuration() || 0) || saved.duration || 0;
-                            var position = saved.position;
+        try {
+            youtubePlayer = new YT.Player(iframe, {
+                events: {
+                    onReady: function (event) {
+                        if (!isCurrentProgress(token)) return;
 
-                            // Restore the saved timestamp (dynamic, from the DB record).
-                            if (position > 0 && (duration <= 0 || position < duration - 2)) {
-                                player.seekTo(position, true);
-                            } else {
-                                position = 0;
-                            }
+                        var player = event.target;
+                        var duration = Math.floor(player.getDuration() || 0)
+                            || saved.duration
+                            || 0;
 
-                            youtubePlayerReady = true;   // saving allowed only after restore
-                            updateProgressUI(position, duration, saved.completed);
+                        var position = Number(saved.position) || 0;
 
-                            clearInterval(progressTimer);
-                            progressTimer = setInterval(function () {
-                                if (
-                                    isCurrentProgress(token) && youtubePlayer && youtubePlayerReady &&
-                                    youtubePlayer.getPlayerState() === YT.PlayerState.PLAYING
-                                ) {
-                                    saveProgress(youtubePlayer.getCurrentTime(), youtubePlayer.getDuration(), false);
-                                }
-                            }, 5000);
-                        },
+                        // Track the furthest position actually watched.
+                        var maxAllowedTime = 0;
+                        var isRestoringPosition = false;
+                        var lastKnownTime = 0;
 
-                        onStateChange: function (event) {
-                            if (!isCurrentProgress(token) || !youtubePlayerReady) return;
+                        // Restore saved progress.
+                        if (
+                            position > 0 &&
+                            (duration <= 0 || position < duration - 2)
+                        ) {
+                            isRestoringPosition = true;
+                            maxAllowedTime = position;
+                            lastKnownTime = position;
 
-                            if (event.data === YT.PlayerState.ENDED) {
-                                var d = event.target.getDuration();
-                                saveProgress(d, d, true);
-                            } else if (event.data === YT.PlayerState.PAUSED) {
-                                saveProgress(event.target.getCurrentTime(), event.target.getDuration(), false);
-                            }
-                        },
+                            player.seekTo(position, true);
 
-                        onError: function (event) {
-                            console.error('YouTube player error code:', event.data);
+                            setTimeout(function () {
+                                isRestoringPosition = false;
+                            }, 1000);
+                        } else {
+                            position = 0;
                         }
+
+                        youtubePlayerReady = true;
+
+                        updateProgressUI(
+                            position,
+                            duration,
+                            saved.completed
+                        );
+
+                        // Remove any previous progress timer.
+                        clearInterval(progressTimer);
+
+                        // Monitor playback and prevent forward seeking.
+                        progressTimer = setInterval(function () {
+                            if (
+                                !isCurrentProgress(token) ||
+                                !youtubePlayer ||
+                                !youtubePlayerReady
+                            ) {
+                                return;
+                            }
+
+                            var state = player.getPlayerState();
+                            var currentTime = player.getCurrentTime();
+                            var videoDuration = player.getDuration();
+
+                            if (!videoDuration || !isFinite(currentTime)) {
+                                return;
+                            }
+
+                            if (isRestoringPosition) {
+                                lastKnownTime = currentTime;
+                                return;
+                            }
+
+                            if (state === YT.PlayerState.PLAYING) {
+                                // If the position jumps forward beyond
+                                // normal playback, return to watched time.
+                                if (currentTime > maxAllowedTime + 2) {
+                                    player.seekTo(maxAllowedTime, true);
+                                    lastKnownTime = maxAllowedTime;
+                                    return;
+                                }
+
+                                // Update watched position only during playback.
+                                if (currentTime > maxAllowedTime) {
+                                    maxAllowedTime = currentTime;
+                                }
+
+                                lastKnownTime = currentTime;
+
+                                saveProgress(
+                                    maxAllowedTime,
+                                    videoDuration,
+                                    false
+                                );
+
+                                updateProgressUI(
+                                    currentTime,
+                                    videoDuration,
+                                    saved.completed
+                                );
+                            } else {
+                                // Detect a forward seek while paused too.
+                                if (currentTime > maxAllowedTime + 2) {
+                                    player.seekTo(maxAllowedTime, true);
+                                    lastKnownTime = maxAllowedTime;
+                                } else {
+                                    lastKnownTime = currentTime;
+                                }
+                            }
+                        }, 1000);
+                    },
+
+                    onStateChange: function (event) {
+                        if (
+                            !isCurrentProgress(token) ||
+                            !youtubePlayerReady
+                        ) {
+                            return;
+                        }
+
+                        var player = event.target;
+                        var duration = player.getDuration();
+                        var currentTime = player.getCurrentTime();
+
+                        if (event.data === YT.PlayerState.ENDED) {
+                            // The video must reach its actual end.
+                            saveProgress(duration, duration, true);
+                        } else if (event.data === YT.PlayerState.PAUSED) {
+                            saveProgress(
+                                currentTime,
+                                duration,
+                                false
+                            );
+                        }
+                    },
+
+                    onError: function (event) {
+                        console.warn(
+                            'YouTube player error code:',
+                            event.data
+                        );
                     }
-                });
-            } catch (error) {
-                console.error('YouTube player initialization failed:', error);
-            }
-        });
+                }
+            });
+        } catch (error) {
+            console.warn(
+                'YouTube player initialization failed:',
+                error
+            );
+        }
+    });
+}
+
+
+function renderVideo(url, vtype) {
+    screen.replaceChildren();
+    screen.className = 'cd-screen';
+    hideProgress();
+
+    if (!url) {
+        setNote('No video has been added for this lesson yet.', true);
+        return;
     }
 
-    function renderVideo(url, vtype) {
-        screen.replaceChildren();
-        screen.className = 'cd-screen';
-        if (!url) { setNote('No video has been added for this lesson yet.', true); return; }
-        var type = guessVideoType(vtype, url), src = '';
-        if (type === 'youtube') {
-            src = youtubeEmbed(url);
+    var type = guessVideoType(vtype, url);
+    var src = '';
 
-            if (!src) {
-                setNote('This YouTube video URL is not valid.', true);
+    // ==========================================
+    // YOUTUBE VIDEO
+    // ==========================================
+    if (type === 'youtube') {
+        src = youtubeEmbed(url);
+
+        if (!src) {
+            setNote('This YouTube video URL is not valid.', true);
+            return;
+        }
+
+        screen.appendChild(el('div', 'cd-loader'));
+
+        var iframe = document.createElement('iframe');
+        iframe.src = src;
+        iframe.title = 'Lesson video player';
+        iframe.allow =
+            'accelerometer; autoplay; clipboard-write; encrypted-media; ' +
+            'gyroscope; picture-in-picture; fullscreen; web-share';
+        iframe.allowFullscreen = true;
+
+        iframe.addEventListener('load', function () {
+            var loader = screen.querySelector('.cd-loader');
+            if (loader) loader.remove();
+        });
+
+        screen.appendChild(iframe);
+
+        var ytPending = startProgress(window.currentLessonData || {});
+        var ytToken = activeProgress ? activeProgress.token : 0;
+
+        ytPending.then(function (saved) {
+            if (!isCurrentProgress(ytToken)) return;
+            if (!saved) return;
+
+            startYouTubeProgress(iframe, saved, ytToken);
+        }).catch(function (error) {
+            console.warn(
+                'Could not start YouTube progress tracking:',
+                error
+            );
+        });
+
+        return;
+    }
+
+    // ==========================================
+    // VIMEO VIDEO
+    // ==========================================
+    if (type === 'vimeo') {
+        src = vimeoEmbed(url);
+
+        if (!src) {
+            setNote('This Vimeo video URL is not valid.', true);
+            return;
+        }
+
+        var vimeoFrame = document.createElement('iframe');
+        vimeoFrame.src = src;
+        vimeoFrame.title = 'Lesson video player';
+        vimeoFrame.allow =
+            'autoplay; fullscreen; picture-in-picture';
+        vimeoFrame.allowFullscreen = true;
+
+        screen.appendChild(vimeoFrame);
+
+        // Track Vimeo playback through the official Vimeo Player SDK.
+        // The server still decides completion from plausible watched intervals.
+        var vmPending = startProgress(window.currentLessonData || {});
+        var vmToken = activeProgress ? activeProgress.token : 0;
+
+        function loadVimeoApi() {
+            if (window.Vimeo && window.Vimeo.Player) {
+                return Promise.resolve();
+            }
+            if (vimeoApiPromise) return vimeoApiPromise;
+
+            vimeoApiPromise = new Promise(function (resolve, reject) {
+                var existing = document.querySelector('script[data-vimeo-player-api]');
+                if (existing) {
+                    existing.addEventListener('load', resolve, { once: true });
+                    existing.addEventListener('error', reject, { once: true });
+                    return;
+                }
+                var script = document.createElement('script');
+                script.src = 'https://player.vimeo.com/api/player.js';
+                script.async = true;
+                script.dataset.vimeoPlayerApi = '1';
+                script.onload = resolve;
+                script.onerror = function () {
+                    vimeoApiPromise = null;
+                    reject(new Error('Failed to load Vimeo Player API'));
+                };
+                document.head.appendChild(script);
+            });
+            return vimeoApiPromise;
+        }
+
+        vmPending.then(function (saved) {
+            if (!isCurrentProgress(vmToken) || !saved || !vimeoFrame.isConnected) return;
+
+            return loadVimeoApi().then(function () {
+                if (!isCurrentProgress(vmToken) || !vimeoFrame.isConnected || !window.Vimeo) return;
+
+                var player = new window.Vimeo.Player(vimeoFrame);
+                vimeoPlayer = player;
+                var maxAllowedTime = Math.max(0, Number(saved.position) || 0);
+                var restoring = false;
+                var lastSaveAt = 0;
+
+                return player.ready().then(function () {
+                    if (!isCurrentProgress(vmToken)) return;
+                    return Promise.all([player.getDuration(), player.getCurrentTime()]).then(function (values) {
+                        var duration = Number(values[0]) || Number(saved.duration) || 0;
+                        if (saved.position > 0 && duration > 0 && saved.position < duration - 2) {
+                            restoring = true;
+                            return player.setCurrentTime(saved.position).catch(function () {}).then(function () {
+                                maxAllowedTime = Number(saved.position) || 0;
+                                setTimeout(function () { restoring = false; }, 500);
+                                updateProgressUI(maxAllowedTime, duration, saved.completed);
+                            });
+                        }
+                        maxAllowedTime = 0;
+                        updateProgressUI(0, duration, saved.completed);
+                    });
+                }).then(function () {
+                    if (!isCurrentProgress(vmToken)) return;
+
+                    player.on('seeking', function (event) {
+                        if (!isCurrentProgress(vmToken) || restoring) return;
+                        var target = Number(event && event.seconds) || 0;
+                        if (target > maxAllowedTime + 2) {
+                            restoring = true;
+                            player.setCurrentTime(maxAllowedTime).catch(function () {}).finally(function () {
+                                setTimeout(function () { restoring = false; }, 250);
+                            });
+                        }
+                    });
+
+                    player.on('timeupdate', function (event) {
+                        if (!isCurrentProgress(vmToken) || restoring) return;
+                        var position = Number(event && event.seconds) || 0;
+                        var duration = Number(event && event.duration) || 0;
+                        if (position > maxAllowedTime && position <= maxAllowedTime + 2) {
+                            maxAllowedTime = position;
+                        }
+                        updateProgressUI(Math.min(position, maxAllowedTime), duration, activeProgress.completed);
+                        var nowMs = Date.now();
+                        if (nowMs - lastSaveAt >= 1000) {
+                            lastSaveAt = nowMs;
+                            player.getPaused().then(function (paused) {
+                                if (!paused && isCurrentProgress(vmToken)) {
+                                    saveProgress(Math.min(position, maxAllowedTime), duration, false);
+                                }
+                            }).catch(function () {});
+                        }
+                    });
+
+                    player.on('pause', function (event) {
+                        if (!isCurrentProgress(vmToken)) return;
+                        saveProgress(Math.min(Number(event.seconds) || 0, maxAllowedTime), Number(event.duration) || 0, false);
+                    });
+
+                    player.on('ended', function (event) {
+                        if (!isCurrentProgress(vmToken)) return;
+                        var duration = Number(event.duration) || 0;
+                        saveProgress(duration, duration, true);
+                    });
+                });
+            });
+        }).catch(function (error) {
+            console.warn('Could not start Vimeo progress tracking:', error);
+        });
+
+        return;
+    }
+
+    // ==========================================
+    // UPLOADED / LOCAL VIDEO
+    // ==========================================
+    var video = document.createElement('video');
+
+    video.src = url;
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+
+    // Highest position the learner has actually played to.
+    var maxAllowedTime = 0;
+
+    // Allow seeking temporarily while restoring saved progress.
+    var isRestoringPosition = false;
+
+    // Prevent the same video from being processed after navigation.
+    var vState = {
+        el: video,
+        ready: false
+    };
+
+    video.addEventListener('error', function () {
+        setNote('This video could not be loaded.', true);
+    });
+
+    screen.appendChild(video);
+
+    var vPending = startProgress(window.currentLessonData || {});
+    var vToken = activeProgress ? activeProgress.token : 0;
+
+    activeVideo = vState;
+
+    function tryPlay() {
+        var p = video.play();
+
+        if (p && p.catch) {
+            p.catch(function () {
+                // Browser may block autoplay.
+            });
+        }
+    }
+
+    // ------------------------------------------
+    // Block forward seeking
+    // ------------------------------------------
+    video.addEventListener('seeking', function () {
+        if (!vState.ready || isRestoringPosition) return;
+
+        // Allow returning to an earlier position, but don't
+        // allow jumping ahead beyond the watched position.
+        if (video.currentTime > maxAllowedTime + 0.5) {
+            video.currentTime = maxAllowedTime;
+        }
+    });
+
+    // ------------------------------------------
+    // Restore previously saved progress
+    // ------------------------------------------
+    vPending.then(function (saved) {
+        if (!isCurrentProgress(vToken) || !video.isConnected) {
+            return;
+        }
+
+        if (!saved) {
+            vState.ready = true;
+            tryPlay();
+            return;
+        }
+
+        function applyResume() {
+            if (!isCurrentProgress(vToken) || !video.isConnected) {
                 return;
             }
 
-            screen.appendChild(el('div', 'cd-loader'));
+            var duration = video.duration;
+            var position = Number(saved.position) || 0;
 
-            var iframe = document.createElement('iframe');
-            iframe.src = src;
-            iframe.title = 'Lesson video player';
-            iframe.allow =
-                'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share';
-            iframe.allowFullscreen = true;
+            if (
+                position > 0 &&
+                isFinite(duration) &&
+                position < duration - 2
+            ) {
+                // Permit a legitimate saved position to be restored.
+                isRestoringPosition = true;
+                video.currentTime = position;
+                maxAllowedTime = position;
 
-            iframe.addEventListener('load', function () {
-                var loader = screen.querySelector('.cd-loader');
-                if (loader) loader.remove();
-            });
-
-            screen.appendChild(iframe);
-
-            var ytPending = startProgress(window.currentLessonData || {});
-            var ytToken = activeProgress ? activeProgress.token : 0;
-
-            ytPending
-                .then(function (saved) {
-                    // null = stale lesson or fetch failed (already logged); video still plays.
-                    if (!saved || !isCurrentProgress(ytToken)) return;
-                    startYouTubeProgress(iframe, saved, ytToken);
-                })
-                .catch(function (error) {
-                    console.error('Could not start YouTube progress tracking:', error);
-                });
-
-            return;
-        }
-        else if (type === 'vimeo') {
-            src = vimeoEmbed(url);
-            if (!src) { setNote('This Vimeo video URL is not valid.', true); return; }
-            var vimeoFrame = document.createElement('iframe'); vimeoFrame.src = src; vimeoFrame.title = 'Lesson video player';
-            vimeoFrame.allow = 'autoplay; fullscreen; picture-in-picture'; vimeoFrame.allowFullscreen = true;
-            screen.appendChild(vimeoFrame);
-            startProgress(window.currentLessonData || {});
-            progressTime.textContent = 'Progress tracking is available for YouTube and uploaded videos.';
-            return;
-        }
-
-        // Uploaded / local video.
-        var video = document.createElement('video');
-        video.src = url; video.controls = true; video.playsInline = true; video.preload = 'metadata';
-        video.addEventListener('error', function(){ setNote('This video could not be loaded.', true); });
-        screen.appendChild(video);
-
-        var vState = {el: video, ready: false};
-        var vPending = startProgress(window.currentLessonData || {});
-        var vToken = activeProgress ? activeProgress.token : 0;
-        activeVideo = vState;
-
-        vPending.then(function (saved) {
-            if (!saved || !isCurrentProgress(vToken) || !video.isConnected) return;
-
-            function applyResume() {
-                if (!isCurrentProgress(vToken)) return;
-                var d = video.duration;
-                var pos = saved.position;
-                if (pos > 0 && isFinite(d) && pos < d - 2) video.currentTime = pos; else pos = 0;
-                vState.ready = true;   // saving allowed only after restore
-                updateProgressUI(pos, isFinite(d) ? d : 0, saved.completed);
-                var p = video.play();
-                if (p && p.catch) p.catch(function (err) { console.warn('Video autoplay was blocked:', err); });
+                // Seeking events are dispatched asynchronously.
+                setTimeout(function () {
+                    isRestoringPosition = false;
+                }, 0);
+            } else {
+                position = 0;
+                maxAllowedTime = 0;
             }
 
-            // loadedmetadata may already have fired while progress was loading.
-            if (video.readyState >= 1) applyResume();
-            else video.addEventListener('loadedmetadata', applyResume, {once: true});
-        }).catch(function (error) {
-            console.error('Could not restore uploaded video progress:', error);
-        });
+            vState.ready = true;
 
-        video.addEventListener('timeupdate', function(){ if (vState.ready && video.duration) updateProgressUI(video.currentTime, video.duration, activeProgress ? activeProgress.completed : false); });
-        video.addEventListener('pause', function(){ if (vState.ready && video.duration && !video.ended) saveProgress(video.currentTime, video.duration, false); });
-        video.addEventListener('ended', function(){ if (vState.ready) saveProgress(video.duration, video.duration, true); });
-        progressTimer = setInterval(function(){ if (vState.ready && isCurrentProgress(vToken) && !video.paused && video.duration) saveProgress(video.currentTime, video.duration, false); }, 5000);
-    }
+            updateProgressUI(
+                position,
+                isFinite(duration) ? duration : 0,
+                saved.completed
+            );
 
-function renderDocument(data) {
+            tryPlay();
+        }
+
+        if (video.readyState >= 1) {
+            applyResume();
+        } else {
+            video.addEventListener('loadedmetadata', applyResume, {
+                once: true
+            });
+        }
+    }).catch(function (error) {
+        console.warn(
+            'Could not restore uploaded video progress:',
+            error
+        );
+
+        if (isCurrentProgress(vToken) && video.isConnected) {
+            vState.ready = true;
+            tryPlay();
+        }
+    });
+
+    // ------------------------------------------
+    // Update progress while the video plays
+    // ------------------------------------------
+    video.addEventListener('timeupdate', function () {
+        if (
+            !vState.ready ||
+            !isCurrentProgress(vToken) ||
+            !video.duration
+        ) {
+            return;
+        }
+
+        // Update the watched position only during normal playback.
+        if (
+            !video.seeking &&
+            !video.paused &&
+            video.currentTime > maxAllowedTime
+        ) {
+            maxAllowedTime = video.currentTime;
+        }
+
+        updateProgressUI(
+            video.currentTime,
+            video.duration,
+            activeProgress ? activeProgress.completed : false
+        );
+    });
+
+    // ------------------------------------------
+    // Save progress when paused
+    // ------------------------------------------
+    video.addEventListener('pause', function () {
+        if (
+            vState.ready &&
+            isCurrentProgress(vToken) &&
+            video.duration &&
+            !video.ended
+        ) {
+            saveProgress(
+                Math.min(video.currentTime, maxAllowedTime),
+                video.duration,
+                false
+            );
+        }
+    });
+
+    // ------------------------------------------
+    // Mark completed when the video ends
+    // ------------------------------------------
+    video.addEventListener('ended', function () {
+        if (
+            vState.ready &&
+            isCurrentProgress(vToken)
+        ) {
+            saveProgress(
+                video.duration,
+                video.duration,
+                true
+            );
+        }
+    });
+
+    // ------------------------------------------
+    // Automatically save progress every 5 seconds
+    // ------------------------------------------
+    progressTimer = setInterval(function () {
+        if (
+            vState.ready &&
+            isCurrentProgress(vToken) &&
+            !video.paused &&
+            video.duration
+        ) {
+            saveProgress(
+                Math.min(video.currentTime, maxAllowedTime),
+                video.duration,
+                false
+            );
+        }
+    }, 5000);
+}
+
+
+    function renderDocument(data) {
     var myToken = ++docToken;
 
-    screen.replaceChildren();
-    screen.className = 'cd-screen';
+        screen.replaceChildren();
+        screen.className = 'cd-screen';
 
-    if (!data.attachment) {
-        setNote('No document has been attached to this lesson yet.', true);
-        return;
-    }
+        if (!data.attachment) {
+            setNote('No document has been attached to this lesson yet.', true);
+            screen.firstChild.style.color = '#667085';
+            return;
+        }
 
     var loader = el('div', 'cd-loader');
     screen.appendChild(loader);
@@ -1257,18 +2035,31 @@ function renderDocument(data) {
         screen.replaceChildren();
         screen.className = 'cd-screen cd-screen--document';
 
-        var iframe = document.createElement('iframe');
-        iframe.src = data.attachment;
-        iframe.title = data.attname || data.title || 'Course document';
-        iframe.setAttribute('loading', 'lazy');
-        iframe.setAttribute('allowfullscreen', 'true');
+        screen.appendChild(el('div', 'cd-loader'));
 
-        screen.appendChild(iframe);
+            var iframe = document.createElement('iframe');
+            iframe.src = data.attachment;
+            iframe.title = data.attname || data.title || 'Course document';
+                iframe.setAttribute('allowfullscreen', 'true');
+        iframe.addEventListener('load', function () {
+            var loader = screen.querySelector('.cd-loader');
+            if (loader) loader.remove();
+        });
+            screen.appendChild(iframe);
     }).catch(function () {
         if (myToken !== docToken) return;
         setNote('No document is available for this lesson yet.', true);
     });
-}
+
+        // Opening a document counts as completing it; the server records it
+        // and re-checks certificate eligibility.
+        var docPending = startProgress(window.currentLessonData || {});
+        var docToken = activeProgress ? activeProgress.token : 0;
+        docPending.then(function (saved) {
+            if (!saved || !isCurrentProgress(docToken)) return;
+            saveProgress(1, 1, true);
+        });
+    }
 
     /* =====================================================
        Quiz
@@ -1287,6 +2078,24 @@ function renderDocument(data) {
         chip.hidden = false;
         chip.textContent = 'Best score: ' + b + '%';
     }
+
+    function isMulti(q) { return q.type === 'multiple_choice' && Array.isArray(q.a); }
+    function hasKey(q) { return isMulti(q) ? q.a.length > 0 : (typeof q.a === 'number' && q.a >= 0); }
+    function keyList(q) { return !hasKey(q) ? [] : (isMulti(q) ? q.a : [q.a]); }
+    function isCorrect(q, picked) {
+        if (!hasKey(q) || picked === undefined) return false;
+        if (isMulti(q)) {
+            var p = (picked || []).slice().sort(function (a, b) { return a - b; });
+            return p.length === q.a.length && p.every(function (v, i) { return v === q.a[i]; });
+        }
+        return picked === q.a;
+    }
+    function answerText(q, picked) {
+        if (picked === undefined) return 'Not answered';
+        if (Array.isArray(picked)) return picked.length ? picked.map(function (i) { return q.opts[i]; }).join(', ') : 'Not answered';
+        return q.opts[picked];
+    }
+    function correctText(q) { return keyList(q).map(function (i) { return q.opts[i]; }).join(', '); }
 
     function updateSidebarQuizScore(lessonId, score, totalScore) {
         var card = document.getElementById('cdQuizScores');
@@ -1365,11 +2174,51 @@ function renderDocument(data) {
             var N = questions.length;
             var answers = {};
             var i = 0;
+        var serverSubmitted = false;
+
+        /* Sends the learner's answers to the server (first completion only).
+           The server scores them itself, creates the QuizAttempt and runs the
+           certificate check. Local retries stay client-side. */
+        function submitToServer(host) {
+            var url = btn.dataset.quizSubmit;
+            if (!url || serverSubmitted) return;
+            serverSubmitted = true;
+
+            var answers = {};
+            questions.forEach(function (q, i) {
+                var p = st.picked[i];
+                if (q.id && p !== undefined) answers[String(q.id)] = p;
+            });
+            if (!Object.keys(answers).length) { serverSubmitted = false; return; }
+
+            fetch(url, {
+                method: 'POST',
+                headers: progressHeaders(),
+                credentials: 'same-origin',
+                keepalive: true,
+                body: JSON.stringify({ answers: answers })
+            }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (d) {
+                    // 409 = already submitted earlier; still carries the certificate status.
+                    if (!r.ok && r.status !== 409) {
+                        console.warn('Quiz submit failed:', r.status, d);
+                        serverSubmitted = false;
+                        return;
+                    }
+                    var status = d.certificate_status;
+                    showCertificateNotice(status, d.certificate_message, d.certificate_url, btn.dataset.certificatesUrl || '');
+                });
+            }).catch(function (e) {
+                console.warn('Quiz submit error:', e);
+                serverSubmitted = false;
+            });
+        }
 
             showQuestion();
 
             function showQuestion() {
                 var q = questions[i];
+            var multi = isMulti(q);
                 var isMulti = q.type === 'multiple_choice';
                 var wrap = el('div', 'cd-quiz');
                 screen.replaceChildren(wrap);
@@ -1393,11 +2242,15 @@ function renderDocument(data) {
                 qEl.tabIndex = -1;
                 wrap.appendChild(qEl);
 
+            if (multi) wrap.appendChild(el('p', 'cd-quiz__hint', 'Select all that apply, then submit your answer.'));
+
                 var list = el('div', 'cd-quiz__opts');
                 list.setAttribute('role', 'group');
                 list.setAttribute('aria-label', 'Answer options');
                 var foot = el('div', 'cd-quiz__foot');
                 var optBtns = [];
+            var sel = [];
+            var submit = null;
 
                 var existing = answers[q.id];
                 var selectedMulti = isMulti ? (Array.isArray(existing) ? existing.slice() : []) : null;
@@ -1449,7 +2302,10 @@ function renderDocument(data) {
                 if (i === 0) go.style.marginLeft = 'auto';
                 go.innerHTML = '<span>' + (last ? 'Submit quiz' : 'Next question') + '</span>' + ICON.right;
                 go.addEventListener('click', function () {
-                    if (last) { submitQuiz(go); } else { i++; showQuestion(); scroller.scrollTop = 0; }
+                   
+                    if (last) { submitQuiz(go); }
+                    else { i++; showQuestion(); scroller.scrollTop = 0; }
+               
                 });
                 foot.appendChild(go);
 
@@ -1494,6 +2350,7 @@ function renderDocument(data) {
             saveBest(lessonId, pct);
             refreshBestChip(lessonId);
             updateSidebarQuizScore(lessonId, result.score, result.total_score);
+            submitToServer();
 
             screen.className = 'cd-screen cd-screen--quiz';
             var wrap = el('div', 'cd-quiz');
@@ -1561,7 +2418,7 @@ function renderDocument(data) {
 
             var bar = ring.querySelector('.bar');
             requestAnimationFrame(function () {
-                requestAnimationFrame(function () { bar.style.strokeDashoffset = String(327 * (1 - pct / 100)); });
+                requestAnimationFrame(function () { barEl.style.strokeDashoffset = String(327 * (1 - pct / 100)); });
             });
             if (reduceMotion) { num.textContent = Math.round(pct) + '%'; }
             else {
@@ -1604,21 +2461,31 @@ function renderDocument(data) {
             info.appendChild(box);
         }
 
-        if (data.attachment && kind !== 'document') {
+        if (data.attachment) {
+            var actions = el('div', 'cd-info-actions');
+
+            if (kind === 'document') {
+                var open = el('a', 'cd-btn cd-btn--outline cd-btn--sm');
+                open.href = data.attachment; open.target = '_blank'; open.rel = 'noopener';
+                open.innerHTML = ICON.external + ' ';
+                open.appendChild(document.createTextNode('Open document'));
+                actions.appendChild(open);
+            }
+
             var a = el('a', 'cd-btn cd-btn--outline cd-btn--sm');
             a.href = data.attachment; a.target = '_blank'; a.rel = 'noopener';
             a.setAttribute('download', data.attname || '');
             a.innerHTML = ICON.download + ' ';
-            a.appendChild(document.createTextNode('Download resource' + (data.attname ? ' (' + data.attname + ')' : '')));
-            info.appendChild(a);
+            a.appendChild(document.createTextNode((kind === 'document' ? 'Download' : 'Download resource') + (data.attname ? ' (' + data.attname + ')' : '')));
+            actions.appendChild(a);
+
+            info.appendChild(actions);
         }
     }
 
     function goToCourseCheckout(btn) {
         if (!btn || !btn.dataset.buyUrl) return;
 
-        // Use the existing Buy Now POST route so the course is added to
-        // the cart and the application's normal checkout flow is followed.
         var form = document.createElement('form');
         form.method = 'POST';
         form.action = btn.dataset.buyUrl;
@@ -1634,6 +2501,20 @@ function renderDocument(data) {
         form.submit();
     }
 
+    function updateNav(index) {
+        var accessiblePos = 0;
+        for (var i = 0; i <= index; i++) { if (!isLocked(i)) accessiblePos++; }
+
+        count.textContent = 'Lesson ' + accessiblePos + ' of ' + accessibleTotal;
+        prevBtn.disabled = index <= 0;
+
+        var last = index >= lessons.length - 1;
+        nextBtn.disabled = last;
+
+        var label = nextBtn.querySelector('span');
+        if (label) label.textContent = (!last && isLocked(index + 1)) ? 'Unlock course' : 'Next';
+    }
+
     function render(index) {
         var btn = lessons[index];
         if (!btn) return;
@@ -1642,7 +2523,7 @@ function renderDocument(data) {
             return;
         }
 
-        stopProgress(true); // save the lesson being left (uses its own lesson id) and destroy its player
+        stopProgress(true);
         if (lessons[current]) lessons[current].classList.remove('is-active');
         current = index;
         btn.classList.add('is-active');
@@ -1662,30 +2543,17 @@ function renderDocument(data) {
 
         tag.textContent = KIND_LABEL[kind] || 'Lesson';
         title.textContent = data.title;
-        count.textContent = 'Lesson ' + (index + 1) + ' of ' + lessons.length;
-        prevBtn.disabled = index === 0;
-        nextBtn.disabled = index === lessons.length - 1;
+        updateNav(index);
 
         window.currentLessonData = data;
-     
 
-if (kind === 'video') {
-    renderVideo(data.url, data.vtype);
-} else {
-    clearInterval(progressTimer);
-    activeProgress = null;
-
-    if (progressShow) {
-        progressShow.hidden = true;
-    }
-
-    if (kind === 'quiz') {
-        renderQuiz(btn);
-    } else {
-        renderDocument(data);
-    }
-}
-
+        if (kind === 'video') {
+            renderVideo(data.url, data.vtype);
+        } else {
+            hideProgress();
+            if (kind === 'quiz') renderQuiz(btn);
+            else renderDocument(data);
+        }
 
         renderInfo(kind, data);
         scroller.scrollTop = 0;
@@ -1716,10 +2584,11 @@ if (kind === 'video') {
     }
 
     function closeModal() {
-        stopProgress(true); // save position, clear timer, destroy player
+        stopProgress(true);
         if (modal.hidden) return;
         modal.classList.remove('is-open');
-        screen.replaceChildren();               // stops any playing video / audio
+        screen.replaceChildren();
+        hideProgress();
         if (lessons[current]) lessons[current].classList.remove('is-active');
         current = -1;
 
@@ -1743,8 +2612,16 @@ if (kind === 'video') {
     modal.addEventListener('click', function (e) {
         if (e.target.closest('[data-close]')) closeModal();
     });
-    prevBtn.addEventListener('click', function () { if (current > 0) render(current - 1); });
-    nextBtn.addEventListener('click', function () { if (current < lessons.length - 1) render(current + 1); });
+
+    prevBtn.addEventListener('click', function () {
+        if (current > 0) render(current - 1);
+    });
+    nextBtn.addEventListener('click', function () {
+        var n = current + 1;
+        if (n >= lessons.length) return;
+        if (isLocked(n)) { goToCourseCheckout(lessons[n]); return; }
+        render(n);
+    });
 
     document.addEventListener('keydown', function (e) {
         if (modal.hidden) return;

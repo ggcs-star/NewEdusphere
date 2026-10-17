@@ -3,44 +3,87 @@
 namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
+use App\Models\Certificate;
 use App\Models\Course;
-use App\Models\Lesson;
-use App\Models\Question;
-use App\Models\QuizAttempt;
-use Illuminate\Http\JsonResponse;
+use App\Models\LessonProgress;
+use App\Models\User;
+use App\Services\CertificateIssuanceService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Throwable;
 
-class QuizController extends Controller
+class LessonProgressController extends Controller
 {
-    private function viewer()
+    /**
+     * Get the currently logged-in user.
+     */
+    private function viewer(Request $request)
     {
+        $sessionUser = $request->session()->get('user');
+
+        $userId = is_object($sessionUser)
+            ? ($sessionUser->id ?? null)
+            : (is_array($sessionUser)
+                ? ($sessionUser['id'] ?? null)
+                : null);
+
+        if ($request->session()->has('user_token') && $userId) {
+            return User::query()->find($userId);
+        }
+
         return function_exists('current_admin_user')
             ? current_admin_user()
             : null;
     }
 
     /**
-     * Confirm that the lesson belongs to the course and that
-     * the current user can access the lesson.
+     * Check whether the user can access the course.
      */
-    private function accessibleLesson(
+    private function canAccess(Course $course, $viewer): bool
+    {
+        if (!$viewer || empty($viewer->id)) {
+            return false;
+        }
+
+        if ($course->is_free) {
+            return true;
+        }
+
+        return DB::table('enrollments')
+            ->where('user_id', $viewer->id)
+            ->where('course_id', $course->id)
+            ->exists();
+    }
+
+    /**
+     * Load saved progress for a lesson.
+     */
+    public function show(
+        Request $request,
         int $courseId,
-        int $lessonId,
-        $viewer
-    ): array {
-        abort_unless($viewer && $viewer->id, 401, 'Please log in first.');
+        int $lessonId
+    ): JsonResponse {
+        $viewer = $this->viewer($request);
+
+        abort_unless($viewer && $viewer->id, 401);
 
         $course = Course::with('sections.lessons')
             ->whereKey($courseId)
             ->firstOrFail();
 
+        abort_unless(
+            $this->canAccess($course, $viewer),
+            403
+        );
+
         $lesson = $course->sections
             ->flatMap(fn ($section) => $section->lessons)
             ->firstWhere('id', $lessonId);
 
-        abort_unless($lesson, 404, 'Lesson not found.');
+        abort_unless($lesson, 404);
 
         $hasAccess = (bool) $course->is_free
             || DB::table('enrollments')
@@ -142,9 +185,12 @@ class QuizController extends Controller
     }
 
     /**
-     * Accept all answers together and score them on the server.
+     * Save playback progress.
+     *
+     * Completion is calculated on the server using watched intervals.
+     * A client-supplied completed flag is deliberately not accepted.
      */
-    public function submit(
+    public function save(
         Request $request,
         int $courseId,
         int $lessonId
@@ -180,101 +226,191 @@ class QuizController extends Controller
             ->orderBy('order')
             ->get();
 
-        abort_if($questions->isEmpty(), 422, 'This quiz has no questions.');
+        abort_unless($lesson, 404);
 
-        $questionIds = $questions->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        $submittedAnswers = $validated['answers'];
-
-        // Do not accept IDs for questions outside this quiz.
-        $extraIds = array_diff(
-            array_map('strval', array_keys($submittedAnswers)),
-            $questionIds
+        abort_unless(
+            $lesson->lesson_type !== 'quiz',
+            422,
+            'Quiz completion must use the quiz endpoint.'
         );
+
+        $duration = (int) round((float) $data['duration']);
+        $position = (int) round((float) $data['position']);
 
         abort_if(
-            !empty($extraIds),
+            $duration < 1 || $position > $duration,
             422,
-            'Invalid question submitted.'
+            'Invalid video position or duration.'
         );
 
-        $score = 0;
-        $savedAnswers = [];
+        /*
+         * Lock the existing progress row to reduce concurrent
+         * update conflicts for the same user and lesson.
+         */
+        $result = DB::transaction(function () use (
+            $viewer,
+            $course,
+            $lessonId,
+            $duration,
+            $position
+        ) {
+            $progress = LessonProgress::query()
+                ->where('user_id', $viewer->id)
+                ->where('course_id', $course->id)
+                ->where('lesson_id', $lessonId)
+                ->lockForUpdate()
+                ->first();
 
-        foreach ($questions as $question) {
-            $questionId = (string) $question->id;
-            $options = array_values($question->options ?? []);
-            $rawAnswer = $submittedAnswers[$questionId] ?? null;
+            if (!$progress) {
+                $progress = new LessonProgress();
 
-            if ($question->type === 'multiple_choice') {
-                abort_if(
-                    $rawAnswer !== null && !is_array($rawAnswer),
-                    422,
-                    'Invalid answer format.'
-                );
-
-                $selected = array_values(array_unique(array_map(
-                    'intval',
-                    $rawAnswer ?? []
-                )));
-
-                foreach ($selected as $index) {
-                    abort_if(
-                        $index < 0 || $index >= count($options),
-                        422,
-                        'Invalid option selected.'
-                    );
-                }
-
-                sort($selected);
-
-                $correct = array_values(array_unique(array_map(
-                    'intval',
-                    $question->correct_answers ?? []
-                )));
-                sort($correct);
-
-                $isCorrect = $selected === $correct;
-
-                $savedAnswers[$questionId] = $selected;
-            } else {
-                abort_if(
-                    $rawAnswer !== null && !is_scalar($rawAnswer),
-                    422,
-                    'Invalid answer format.'
-                );
-
-                $selected = $rawAnswer === null || $rawAnswer === ''
-                    ? null
-                    : (int) $rawAnswer;
-
-                if ($selected !== null) {
-                    abort_if(
-                        $selected < 0 || $selected >= count($options),
-                        422,
-                        'Invalid option selected.'
-                    );
-                }
-
-                $correct = array_map(
-                    'intval',
-                    $question->correct_answers ?? []
-                );
-
-                $isCorrect = $selected !== null
-                    && in_array($selected, $correct, true);
-
-                $savedAnswers[$questionId] = $selected;
+                $progress->user_id = $viewer->id;
+                $progress->course_id = $course->id;
+                $progress->lesson_id = $lessonId;
+                $progress->last_position_seconds = 0;
+                $progress->duration_seconds = $duration;
+                $progress->last_reported_position_seconds = 0;
+                $progress->watched_ranges = [];
+                $progress->is_completed = false;
             }
 
-            if ($isCorrect) {
-                $score += (int) $question->points;
-            }
-        }
+            $alreadyCompleted = (bool) $progress->is_completed;
 
-        $totalScore = (int) $questions->sum('points');
+            $ranges = $progress->watched_ranges ?? [];
+
+            if (!is_array($ranges)) {
+                $ranges = [];
+            }
+
+            $now = now();
+
+            $previousPosition = (int) (
+                $progress->last_reported_position_seconds ?? 0
+            );
+
+            $previousTime = $progress->last_watched_at;
+
+            // Whole seconds between the previous accepted report and now.
+            $elapsed = $previousTime
+                ? max(0, $now->getTimestamp() - $previousTime->getTimestamp())
+                : 0;
+
+            $delta = $position - $previousPosition;
+
+            /*
+             * HARDENING: a report that lands in the same server second is
+             * ignored for crediting AND the baseline is left untouched, so
+             * the next report credits the whole span. Credit is still
+             * limited by real elapsed time, so spamming requests cannot
+             * fast-forward progress.
+             */
+            $tooSoon = $previousTime && $elapsed < 1;
+
+            /*
+             * Count a forward interval only when its movement is plausible
+             * for the elapsed server time (+2s tolerance for rounding).
+             * Long gaps and large forward seeks do not add coverage.
+             */
+            if (
+                !$alreadyCompleted &&
+                $previousTime &&
+                !$tooSoon &&
+                $elapsed <= 20 &&
+                $delta > 0 &&
+                $delta <= ($elapsed + 2)
+            ) {
+                $ranges[] = [
+                    $previousPosition,
+                    $position,
+                ];
+            }
+
+            // Normalize intervals and clamp them to the current duration.
+            $normalized = [];
+
+            foreach ($ranges as $range) {
+                if (!is_array($range) || count($range) < 2) {
+                    continue;
+                }
+
+                $start = max(
+                    0,
+                    min((int) $range[0], $duration)
+                );
+
+                $end = max(
+                    0,
+                    min((int) $range[1], $duration)
+                );
+
+                if ($end > $start) {
+                    $normalized[] = [$start, $end];
+                }
+            }
+
+            // Sort intervals by their start position.
+            usort(
+                $normalized,
+                fn ($a, $b) => $a[0] <=> $b[0]
+            );
+
+            // Merge overlapping intervals to prevent double-counting.
+            $merged = [];
+
+            foreach ($normalized as $range) {
+                $lastIndex = count($merged) - 1;
+
+                if (
+                    $lastIndex >= 0 &&
+                    $range[0] <= $merged[$lastIndex][1]
+                ) {
+                    $merged[$lastIndex][1] = max(
+                        $merged[$lastIndex][1],
+                        $range[1]
+                    );
+                } else {
+                    $merged[] = $range;
+                }
+            }
+
+            $watchedSeconds = 0;
+            $furthestWatched = 0;
+
+            foreach ($merged as $range) {
+                $watchedSeconds += $range[1] - $range[0];
+
+                $furthestWatched = max(
+                    $furthestWatched,
+                    $range[1]
+                );
+            }
+
+            $coverage = $duration > 0
+                ? $watchedSeconds / $duration
+                : 0;
+
+            /*
+             * Require at least 95% unique coverage and playback
+             * reaching the final five seconds.
+             */
+            $completed = $alreadyCompleted || (
+                $coverage >= 0.95 &&
+                $furthestWatched >= ($duration - 5)
+            );
+
+            $progress->course_id = $course->id;
+            $progress->duration_seconds = $duration;
+            $progress->last_position_seconds = $position;
+            $progress->watched_ranges = $merged;
+            $progress->is_completed = $completed;
+
+            // Move the credit baseline only when this report was evaluated.
+            if (!$tooSoon) {
+                $progress->last_reported_position_seconds = $position;
+                $progress->last_watched_at = $now;
+            }
+
+            $progress->save();
 
         $attributes = [
             'score' => $score,
