@@ -26,6 +26,10 @@ class CartController extends Controller
 
     public function add(Request $request, int $courseId): RedirectResponse
     {
+        if ($blocked = $this->blockNonStudents()) {
+            return $blocked;
+        }
+
         $course = Course::where('status', 'active')->findOrFail($courseId);
         $ids = $this->ids($request);
         if (!in_array($course->id, $ids, true)) $ids[] = $course->id;
@@ -35,11 +39,39 @@ class CartController extends Controller
 
     public function buyNow(Request $request, int $courseId): RedirectResponse
     {
+        if ($blocked = $this->blockNonStudents()) {
+            return $blocked;
+        }
+
         $course = Course::where('status', 'active')->findOrFail($courseId);
         $ids = $this->ids($request);
         if (!in_array($course->id, $ids, true)) $ids[] = $course->id;
         $request->session()->put('cart_course_ids', $ids);
         return redirect()->route('checkout.index');
+    }
+
+    /**
+     * Admins and instructors don't buy courses — only students do. Blocking
+     * it here (not just at final checkout) avoids letting them build up a
+     * cart they can never actually pay for.
+     */
+    private function blockNonStudents(): ?RedirectResponse
+    {
+        $user = current_admin_user();
+
+        if (! $user) {
+            return null;
+        }
+
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard')->with('info', 'Admins cannot purchase courses.');
+        }
+
+        if ($user->isInstructor()) {
+            return redirect()->route('instructor.dashboard')->with('info', 'Instructors cannot purchase courses.');
+        }
+
+        return null;
     }
 
     public function remove(Request $request, int $courseId): RedirectResponse

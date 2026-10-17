@@ -26,4 +26,11 @@ class FileUploadService
 
         return $this->store($newFile, $directory, $disk);
     }
+
+    public function delete(?string $path, string $disk = 'public'): void
+    {
+        if ($path) {
+            Storage::disk($disk)->delete($path);
+        }
+    }
 }

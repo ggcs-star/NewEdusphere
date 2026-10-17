@@ -192,11 +192,11 @@
                                     @if ($course->is_free)
                                         <span class="text-emerald-600 font-semibold">Free</span>
                                     @elseif ($course->hasDiscount())
-                                        <span class="text-slate-400 line-through text-xs">${{ number_format($course->price, 2) }}</span>
-                                        <span class="text-rose-600 font-semibold ml-1">${{ number_format($course->discount_price, 2) }}</span>
+                                        <span class="text-slate-400 line-through text-xs">{{ format_price($course->price) }}</span>
+                                        <span class="text-rose-600 font-semibold ml-1">{{ format_price($course->discount_price) }}</span>
                                         <span class="block text-[10px] text-rose-500">{{ $course->discountPercent() }}% off</span>
                                     @else
-                                        ${{ number_format($course->price, 2) }}
+                                        {{ format_price($course->price) }}
                                     @endif
                                 </td>
                                 <td class="px-5 py-3.5">

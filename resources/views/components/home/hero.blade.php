@@ -5,12 +5,14 @@
         <div class="hero-content">
             <div class="hero-kicker">Learn Anytime, Anywhere</div>
 
-            <h1>Build Your Future With <span>EduSphere</span></h1>
+            @if ($siteSettings['banner_title'] === \App\Models\Setting::DEFAULTS['frontend']['banner_title'])
+                <h1>Build Your Future With <span>EduSphere</span></h1>
+            @else
+                <h1>{{ $siteSettings['banner_title'] }}</h1>
+            @endif
 
             <p class="hero-description">
-                Get access to high-quality online courses, expert instructors, and a
-                supportive learning community. Learn new skills, advance your career,
-                and achieve your goals.
+                {{ $siteSettings['banner_sub_title'] }}
             </p>
 
             <div class="hero-buttons">
@@ -33,8 +35,8 @@
         <div class="hero-image">
           <div class="hero-visual-card">
             <img
-                src="{{ asset('images/background.png') }}"
-                alt="Student learning online with EduSphere — video lectures, quizzes and certificates"
+                src="{{ $siteSettings['banner_image'] ? Storage::url($siteSettings['banner_image']) : asset('images/background.png') }}"
+                alt="Student learning online with {{ $siteSettings['system_name'] }} — video lectures, quizzes and certificates"
                 class="hero-visual"
                 fetchpriority="high"
             >

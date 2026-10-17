@@ -46,18 +46,12 @@
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
                 <x-admin.searchable-select
                     name="role"
-                    :options="['user' => 'User', 'admin' => 'Admin']"
+                    :options="['user' => 'User', 'instructor' => 'Instructor', 'admin' => 'Admin']"
                     :selected="old('role', $user->role ?? 'user')"
                     required
                 />
+                <p class="text-xs text-slate-400 mt-1">Instructors can create and sell courses (pending your approval).</p>
             </div>
-
-            <label class="inline-flex items-center gap-2">
-                <input type="hidden" name="is_instructor" value="0">
-                <input type="checkbox" name="is_instructor" value="1" @checked(old('is_instructor', $user->is_instructor))
-                    class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                <span class="text-sm text-slate-700">Allow this user to create and sell courses (Instructor)</span>
-            </label>
         </div>
 
         <div class="flex justify-end gap-2 mt-6">

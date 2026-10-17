@@ -39,6 +39,7 @@
             label="Categories"
             :change="$stats['categories']['change']"
             :direction="$stats['categories']['direction']"
+            :href="route('admin.categories.index')"
         />
         <x-admin.stat-card
             icon="fa-book-open"
@@ -47,6 +48,7 @@
             label="Active Courses"
             :change="$stats['activeCourses']['change']"
             :direction="$stats['activeCourses']['direction']"
+            :href="route('admin.courses.index', ['status' => 'active'])"
         />
         <x-admin.stat-card
             icon="fa-user-graduate"
@@ -55,8 +57,16 @@
             label="Students"
             :change="$stats['students']['change']"
             :direction="$stats['students']['direction']"
+            :href="route('admin.users.index', ['role' => 'user'])"
         />
     </div>
 
-    <x-admin.revenue-analytics :analytics="$analytics" period-route="admin.dashboard" :is-admin="true" />
+    <x-admin.revenue-analytics
+        :analytics="$analytics"
+        period-route="admin.dashboard"
+        revenue-route="admin.revenue.index"
+        courses-route="admin.courses.index"
+        instructors-route="admin.users.index"
+        :is-admin="true"
+    />
 </x-layouts.admin>

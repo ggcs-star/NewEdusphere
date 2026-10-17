@@ -53,7 +53,7 @@
 
         <div class="list-row">
             <span class="price">
-                {{ !empty($course->is_free) ? 'Free' : '₹' . number_format((float) $coursePrice, 0) }}
+                {{ !empty($course->is_free) ? 'Free' : format_price((float) $coursePrice, 0) }}
             </span>
 
             <a class="btn btn-purple" href="{{ $courseUrl }}">

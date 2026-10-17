@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Payment;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,43 @@ use Throwable;
 
 class CheckoutController extends Controller
 {
+    /**
+     * Admin-configured Razorpay credentials (Settings -> Payment) take
+     * priority; .env is only a fallback for deployments that haven't set
+     * them through the admin panel yet.
+     *
+     * @return array{key: ?string, secret: ?string}
+     */
+    private function razorpayCredentials(): array
+    {
+        return [
+            'key' => Setting::get('razorpay_key') ?: config('services.razorpay.key'),
+            'secret' => Setting::get('razorpay_secret') ?: config('services.razorpay.secret'),
+        ];
+    }
+
+    /**
+     * Splits a sale amount between the platform and the course's instructor,
+     * per Settings -> Instructor. The admin's own courses keep 100% (nothing
+     * to pay out), and so does every course when "Allow users to become
+     * instructors and sell courses" is off — matching how disabling that
+     * setting behaves in the reference LMS.
+     *
+     * @return array{adminRevenue: float, instructorRevenue: float, instructorPaidOut: bool}
+     */
+    private function splitRevenue(Course $course, float $amount): array
+    {
+        if ($course->instructor?->isAdmin() || Setting::get('allow_instructor', '1') !== '1') {
+            return ['adminRevenue' => $amount, 'instructorRevenue' => 0.0, 'instructorPaidOut' => true];
+        }
+
+        $percent = max(0, min(100, (float) Setting::get('instructor_revenue_percent', '70')));
+        $instructorRevenue = round($amount * $percent / 100, 2);
+        $adminRevenue = round($amount - $instructorRevenue, 2);
+
+        return ['adminRevenue' => $adminRevenue, 'instructorRevenue' => $instructorRevenue, 'instructorPaidOut' => false];
+    }
+
     /**
      * Display checkout page.
      */
@@ -101,6 +139,13 @@ if ($user->isAdmin()) {
         ->with('info', 'Admins cannot purchase courses.');
 }
 
+// Instructors create and sell courses, not buy them.
+if ($user->isInstructor()) {
+    return redirect()
+        ->route('instructor.dashboard')
+        ->with('info', 'Instructors cannot purchase courses.');
+}
+
 
         if (!$user) {
             $request->session()->forget([
@@ -124,6 +169,7 @@ if ($user->isAdmin()) {
         }
 
         $courses = Course::query()
+            ->with('instructor')
             ->where('status', 'active')
             ->whereIn('id', $ids)
             ->get();
@@ -180,6 +226,7 @@ if ($user->isAdmin()) {
                             'amount' => 0,
                             'admin_revenue' => 0,
                             'instructor_revenue' => 0,
+                            'instructor_paid_out' => true,
                             'status' => 'paid',
                         ]
                     );
@@ -198,8 +245,7 @@ if ($user->isAdmin()) {
                 ->with('success', 'You are enrolled successfully.');
         }
 
-        $key = config('services.razorpay.key');
-        $secret = config('services.razorpay.secret');
+        ['key' => $key, 'secret' => $secret] = $this->razorpayCredentials();
 
         if (empty($key) || empty($secret)) {
             return redirect()
@@ -225,13 +271,16 @@ if ($user->isAdmin()) {
             // Save a payment record for each course in this order.
             DB::transaction(function () use ($user, $courses, $order) {
                 foreach ($courses as $course) {
+                    $split = $this->splitRevenue($course, $course->effectivePrice());
+
                     Payment::create([
                         'user_id' => $user->id,
                         'course_id' => $course->id,
                         'payment_method' => 'razorpay',
                         'amount' => $course->effectivePrice(),
-                        'admin_revenue' => 0,
-                        'instructor_revenue' => 0,
+                        'admin_revenue' => $split['adminRevenue'],
+                        'instructor_revenue' => $split['instructorRevenue'],
+                        'instructor_paid_out' => $split['instructorPaidOut'],
                         'razorpay_order_id' => $order['id'],
                         'status' => 'pending',
                     ]);
@@ -239,7 +288,7 @@ if ($user->isAdmin()) {
             });
 
         return view('frontend.checkout.razorpay', [
-    'razorpayKey' => config('services.razorpay.key'),
+    'razorpayKey' => $key,
     'orderId' => $order['id'],
     'amount' => $amountInPaise,
     'currency' => 'INR',
@@ -308,8 +357,7 @@ public function verify(Request $request): RedirectResponse
     }
 
     try {
-        $key = config('services.razorpay.key');
-        $secret = config('services.razorpay.secret');
+        ['key' => $key, 'secret' => $secret] = $this->razorpayCredentials();
 
         if (empty($key) || empty($secret)) {
             throw new \RuntimeException(

@@ -30,12 +30,7 @@
     {{-- Profile summary --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <x-admin.info-card icon="fa-user-shield" color="violet" label="Role">
-            <div class="flex flex-wrap items-center gap-1.5">
-                <span class="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-900 shadow-sm ring-1 ring-black/5">{{ ucfirst($user->role) }}</span>
-                @if ($user->is_instructor)
-                    <span class="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-accent-700 shadow-sm ring-1 ring-black/5">Instructor</span>
-                @endif
-            </div>
+            {{ ucfirst($user->role) }}
         </x-admin.info-card>
         <x-admin.info-card icon="fa-circle-check" color="{{ $user->status ? 'emerald' : 'rose' }}" label="Status">
             {{ $user->status ? 'Active' : 'Suspended' }}
@@ -103,7 +98,7 @@
                                         @if ($course->is_free)
                                             <span class="text-emerald-600 font-semibold">Free</span>
                                         @else
-                                            ${{ number_format($course->price, 2) }}
+                                            {{ format_price($course->price) }}
                                         @endif
                                     </td>
                                     <td class="px-5 py-3.5">
@@ -119,7 +114,7 @@
     </div>
 
     {{-- Courses taught (only for instructors) --}}
-    @if ($user->is_instructor)
+    @if ($user->isInstructor())
         <div>
             <div class="flex items-center gap-2 mb-4">
                 <span class="h-7 w-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">

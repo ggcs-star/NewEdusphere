@@ -36,7 +36,6 @@
         ['label' => 'Courses',     'url' => url('/courses'),        'active' => request()->is('courses', 'courses/*')],
         ['label' => 'About Us',    'url' => url('/about'),          'active' => request()->is('about', 'about/*')],
         ['label' => 'Categories',  'url' => url('/categories'),     'active' => request()->is('categories', 'categories/*')],
-        ['label' => 'My Learning', 'url' => url('/my-courses'),     'active' => request()->is('my-courses', 'my-courses/*')],
         ['label' => 'Contact Us',  'url' => url('/contact'),        'active' => request()->is('contact', 'contact/*')],
     ];
 @endphp
@@ -48,25 +47,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Learn, Grow, Succeed') · EduSphere</title>
+    <title>@hasSection('title')@yield('title') · {{ $siteSettings['system_name'] }}@else{{ $siteSettings['system_title'] }}@endif</title>
 
     @stack('meta')
 
-    <meta name="description" content="Explore courses, develop new skills and build your future with EduSphere.">
+    <meta name="description" content="{{ $siteSettings['website_description'] }}">
+    @if ($siteSettings['website_keywords'])
+        <meta name="keywords" content="{{ $siteSettings['website_keywords'] }}">
+    @endif
+    @if ($siteSettings['author'])
+        <meta name="author" content="{{ $siteSettings['author'] }}">
+    @endif
     <meta name="theme-color" content="#32105f">
+
+    @if ($siteSettings['favicon'])
+        <link rel="icon" href="{{ Storage::url($siteSettings['favicon']) }}">
+    @endif
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    @php
+        // Defensive re-validation — the admin form already only accepts
+        // #rrggbb values, but this guards against any CSS-breaking value
+        // that bypassed it (e.g. a direct DB edit) before it reaches <style>.
+        $themeColor = fn (string $key, string $fallback) => preg_match('/^#[0-9a-fA-F]{6}$/', $siteSettings[$key] ?? '')
+            ? $siteSettings[$key]
+            : $fallback;
+    @endphp
     <style>
         :root {
-            --purple: #32105f;
-            --purple-dark: #250b49;
-            --purple-light: #4a2677;
-            --gold: #f5bd32;
-            --gold-dark: #d8a017;
+            --purple: {{ $themeColor('theme_primary_color', '#32105f') }};
+            --purple-dark: {{ $themeColor('theme_primary_dark', '#250b49') }};
+            --purple-light: {{ $themeColor('theme_primary_light', '#4a2677') }};
+            --gold: {{ $themeColor('theme_secondary_color', '#f5bd32') }};
+            --gold-dark: {{ $themeColor('theme_secondary_dark', '#d8a017') }};
             --white: #fff;
             --text: #211735;
             --muted: #777083;
@@ -176,6 +193,7 @@
 
         .brand { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; min-width: 0; }
         .brand-symbol { width: 43px; height: 43px; display: grid; place-items: center; font-size: 30px; }
+        .brand-logo-img { max-height: 44px; width: auto; object-fit: contain; }
 
         .brand-name {
             display: block;
@@ -654,7 +672,7 @@
 
         /* Footer */
         .footer { color: #e9dff4; background: #21083f; }
-        .footer-main { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 35px; padding: 48px 0 35px; }
+        .footer-main { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; gap: 35px; padding: 48px 0 35px; }
         .footer-main > * { min-width: 0; }
         .footer .brand-name { color: white; }
         .footer .brand-tagline { color: #d2c0e6; }
@@ -1109,29 +1127,50 @@
 <div class="topbar">
     <div class="container topbar-inner">
         <div class="contact-info">
-            <a href="tel:+919876543210">☎ +91 98765 43210</a>
-            <a href="mailto:support@edusphere.in">✉ support@edusphere.in</a>
-            <span class="location-item">⌖ Bhopal, Madhya Pradesh</span>
+            @if ($siteSettings['phone'])
+                <a href="tel:{{ preg_replace('/[^0-9+]/', '', $siteSettings['phone']) }}">☎ {{ $siteSettings['phone'] }}</a>
+            @endif
+            @if ($siteSettings['system_email'])
+                <a href="mailto:{{ $siteSettings['system_email'] }}">✉ {{ $siteSettings['system_email'] }}</a>
+            @endif
+            @if ($siteSettings['address'])
+                <span class="location-item">⌖ {{ $siteSettings['address'] }}</span>
+            @endif
         </div>
 
-        <div class="social-links" aria-label="Social links">
-            <a href="https://facebook.com/" target="_blank" rel="noopener noreferrer">f</a>
-            <a href="https://instagram.com/" target="_blank" rel="noopener noreferrer">◎</a>
-            <a href="https://linkedin.com/" target="_blank" rel="noopener noreferrer">in</a>
-            <a href="https://youtube.com/" target="_blank" rel="noopener noreferrer">▶</a>
-        </div>
+        @if ($siteSettings['facebook_link'] || $siteSettings['twitter_link'] || $siteSettings['linkedin_link'])
+            <div class="social-links" aria-label="Social links">
+                @if ($siteSettings['facebook_link'])
+                    <a href="{{ $siteSettings['facebook_link'] }}" target="_blank" rel="noopener noreferrer" aria-label="Facebook">f</a>
+                @endif
+                @if ($siteSettings['twitter_link'])
+                    <a href="{{ $siteSettings['twitter_link'] }}" target="_blank" rel="noopener noreferrer" aria-label="Twitter">𝕏</a>
+                @endif
+                @if ($siteSettings['linkedin_link'])
+                    <a href="{{ $siteSettings['linkedin_link'] }}" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">in</a>
+                @endif
+            </div>
+        @endif
     </div>
 </div>
 
 {{-- Navbar --}}
 <header class="main-header">
     <div class="container navbar">
-        <a href="{{ route('home') }}" class="brand" aria-label="EduSphere home">
-            <span class="brand-symbol" aria-hidden="true">🎓</span>
-            <span>
-                <span class="brand-name">Edu<span>Sphere</span></span>
-                <span class="brand-tagline">LEARN · GROW · SUCCEED</span>
-            </span>
+        <a href="{{ route('home') }}" class="brand" aria-label="{{ $siteSettings['system_name'] }} home">
+            @if ($siteSettings['light_logo'])
+                <img src="{{ Storage::url($siteSettings['light_logo']) }}" alt="{{ $siteSettings['system_name'] }}" class="brand-logo-img">
+            @else
+                <span class="brand-symbol" aria-hidden="true">🎓</span>
+                <span>
+                    @if ($siteSettings['system_name'] === 'EduSphere')
+                        <span class="brand-name">Edu<span>Sphere</span></span>
+                    @else
+                        <span class="brand-name">{{ $siteSettings['system_name'] }}</span>
+                    @endif
+                    <span class="brand-tagline">{{ strtoupper($siteSettings['slogan']) }}</span>
+                </span>
+            @endif
         </a>
 
         <nav class="nav-links" id="mainNavigation" aria-label="Main navigation">
@@ -1139,7 +1178,6 @@
             <a href="{{ url('/courses') }}" class="{{ request()->is('courses*') ? 'active' : '' }}">Courses</a>
             <a href="{{ url('/about') }}" class="{{ request()->is('about*') ? 'active' : '' }}">About Us</a>
             <a href="{{ url('/categories') }}" class="{{ request()->is('categories*') ? 'active' : '' }}">Categories</a>
-            <a href="{{ url('/my-courses') }}" class="{{ request()->is('my-courses*') ? 'active' : '' }}">My Learning</a>
             <a href="{{ url('/contact') }}" class="{{ request()->is('contact*') ? 'active' : '' }}">Contact Us</a>
         </nav>
 
@@ -1255,14 +1293,22 @@
         <div class="footer-main">
             <div class="footer-about">
                 <a href="{{ route('home') }}" class="brand">
-                    <span class="brand-symbol" aria-hidden="true">🎓</span>
-                    <span>
-                        <span class="brand-name">Edu<span>Sphere</span></span>
-                        <span class="brand-tagline">LEARN · GROW · SUCCEED</span>
-                    </span>
+                    @if ($siteSettings['dark_logo'])
+                        <img src="{{ Storage::url($siteSettings['dark_logo']) }}" alt="{{ $siteSettings['system_name'] }}" class="brand-logo-img">
+                    @else
+                        <span class="brand-symbol" aria-hidden="true">🎓</span>
+                        <span>
+                            @if ($siteSettings['system_name'] === 'EduSphere')
+                                <span class="brand-name">Edu<span>Sphere</span></span>
+                            @else
+                                <span class="brand-name">{{ $siteSettings['system_name'] }}</span>
+                            @endif
+                            <span class="brand-tagline">{{ strtoupper($siteSettings['slogan']) }}</span>
+                        </span>
+                    @endif
                 </a>
 
-                <p>Discover knowledge, explore new interests and build your future with EduSphere.</p>
+                <p>{{ $siteSettings['website_description'] }}</p>
             </div>
 
             <div class="footer-col">
@@ -1281,16 +1327,30 @@
             </div>
 
             <div class="footer-col">
+                <h4>Legal</h4>
+                <a href="{{ url('/about') }}">About</a>
+                <a href="{{ route('privacy') }}">Privacy Policy</a>
+                <a href="{{ route('terms') }}">Terms &amp; Condition</a>
+            </div>
+
+            <div class="footer-col">
                 <h4>Contact Us</h4>
-                <a href="mailto:support@edusphere.in">support@edusphere.in</a>
-                <a href="tel:+919876543210">+91 98765 43210</a>
+                @if ($siteSettings['system_email'])
+                    <a href="mailto:{{ $siteSettings['system_email'] }}">{{ $siteSettings['system_email'] }}</a>
+                @endif
+                @if ($siteSettings['phone'])
+                    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $siteSettings['phone']) }}">{{ $siteSettings['phone'] }}</a>
+                @endif
                 <a href="{{ url('/contact') }}">Contact us</a>
+                @if ($siteSettings['footer_link'])
+                    <a href="{{ $siteSettings['footer_link'] }}" target="_blank" rel="noopener noreferrer">More</a>
+                @endif
             </div>
         </div>
 
         <div class="footer-bottom">
-            <span>© {{ date('Y') }} EduSphere. All rights reserved.</span>
-            <span>Learn · Grow · Succeed</span>
+            <span>© {{ date('Y') }} {{ $siteSettings['system_name'] }}. All rights reserved.</span>
+            <span>{{ $siteSettings['slogan'] }}</span>
         </div>
     </div>
 </footer>

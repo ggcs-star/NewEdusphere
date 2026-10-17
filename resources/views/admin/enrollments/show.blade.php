@@ -47,10 +47,10 @@
             @elseif ($enrollment->course->is_free)
                 Free
             @elseif ($enrollment->course->hasDiscount())
-                <span class="text-base">${{ number_format($enrollment->course->discount_price, 2) }}</span>
-                <span class="text-sm font-medium text-slate-400 line-through ml-1">${{ number_format($enrollment->course->price, 2) }}</span>
+                <span class="text-base">{{ format_price($enrollment->course->discount_price) }}</span>
+                <span class="text-sm font-medium text-slate-400 line-through ml-1">{{ format_price($enrollment->course->price) }}</span>
             @else
-                ${{ number_format($enrollment->course->price, 2) }}
+                {{ format_price($enrollment->course->price) }}
             @endif
         </x-admin.info-card>
     </div>

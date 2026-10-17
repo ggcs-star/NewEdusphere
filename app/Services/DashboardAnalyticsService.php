@@ -38,7 +38,7 @@ class DashboardAnalyticsService
             'trend' => $this->revenueTrend($instructorId, $period),
             'topCourses' => $this->topCourses($instructorId),
             'topInstructors' => $instructorId ? [] : $this->topInstructors(),
-            'recentPayments' => $this->recentPayments($instructorId),
+            'recentPayments' => $this->recentPayments($instructorId, $period),
             'students' => $this->studentStats($instructorId),
         ];
     }
@@ -157,7 +157,7 @@ class DashboardAnalyticsService
             ->get(['id', 'title', 'thumbnail', 'status'])
             ->map(fn (Course $course) => [
                 'title' => $course->title,
-                'thumbnail' => $course->thumbnailUrl(),
+                'thumbnail' => $course->thumbnail,
                 'status' => $course->status,
                 'revenue' => (float) ($course->revenue ?? 0),
                 'students' => $course->enrollments_count,
@@ -184,9 +184,16 @@ class DashboardAnalyticsService
             ->all();
     }
 
-    private function recentPayments(?int $instructorId): array
+    private function recentPayments(?int $instructorId, string $period): array
     {
+        [$from, $to] = match ($period) {
+            'day' => [now()->startOfDay(), now()->endOfDay()],
+            'week' => [now()->startOfWeek(), now()->endOfWeek()],
+            'month' => [now()->startOfMonth(), now()->endOfMonth()],
+        };
+
         return $this->paymentQuery($instructorId)
+            ->whereBetween('created_at', [$from, $to])
             ->with(['user:id,name,email', 'course:id,title'])
             ->latest()
             ->take(8)

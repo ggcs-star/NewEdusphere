@@ -12,15 +12,7 @@
             <div class="section-kicker">ABOUT EDUSPHERE</div>
             <h2>Learn Today.<br>Grow Every Day.</h2>
 
-            <p>
-                EduSphere helps learners discover subjects, explore courses
-                and build knowledge around their goals.
-            </p>
-
-            <p>
-                Whether you are starting something new or developing
-                existing skills, your next learning opportunity starts here.
-            </p>
+            <div class="prose">{!! $siteSettings['about_us'] !!}</div>
 
             <div class="about-points">
                 <div class="about-point"><span class="check"><x-icon name="check" /></span> Flexible learning</div>

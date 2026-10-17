@@ -50,10 +50,10 @@
             @if ($course->is_free)
                 Free
             @elseif ($course->hasDiscount())
-                <span class="text-base">${{ number_format($course->discount_price, 2) }}</span>
-                <span class="text-sm font-medium text-slate-400 line-through ml-1">${{ number_format($course->price, 2) }}</span>
+                <span class="text-base">{{ format_price($course->discount_price) }}</span>
+                <span class="text-sm font-medium text-slate-400 line-through ml-1">{{ format_price($course->price) }}</span>
             @else
-                ${{ number_format($course->price, 2) }}
+                {{ format_price($course->price) }}
             @endif
         </x-admin.info-card>
     </div>

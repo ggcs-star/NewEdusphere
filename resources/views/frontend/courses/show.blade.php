@@ -310,7 +310,9 @@ $buildQuiz = function ($lesson) use ($pick, $readList): array {
     /* ---------- Meta ---------- */
     $instructor     = $course->instructor ?? null;
     $instructorName = $instructor->name ?? 'EduSphere Team';
-    $instructorBio  = trim(strip_tags((string) $attr($instructor, 'bio', '')));
+    $instructorBio  = trim(strip_tags((string) $attr($instructor, 'biography', '')));
+    $instructorTitle = trim((string) $attr($instructor, 'short_title', ''));
+    $instructorSocial = $instructor?->socialLinks() ?? [];
     $levelLabel     = ucfirst(str_replace('_', ' ', $course->level ?? 'All levels'));
     $language       = $course->language ?? 'English';
     $categoryName   = $course->category?->name ?? null;
@@ -1640,12 +1642,26 @@ html.cd-lock { overflow: hidden; }
                 <section class="cd-panel cd-reveal" aria-labelledby="cd-instructor">
                     <h2 class="cd-h2" id="cd-instructor">Your Instructor</h2>
                     <div class="cd-inst">
-                        <div class="cd-inst__avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($instructorName, 0, 1)) }}</div>
+                        @if ($instructor?->avatarUrl())
+                            <img src="{{ $instructor->avatarUrl() }}" alt="{{ $instructorName }}" class="cd-inst__avatar" style="object-fit:cover">
+                        @else
+                            <div class="cd-inst__avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($instructorName, 0, 1)) }}</div>
+                        @endif
                         <div>
                             <div class="cd-inst__name">{{ $instructorName }}</div>
-                            <div class="cd-inst__role">Course instructor</div>
+                            <div class="cd-inst__role">{{ $instructorTitle !== '' ? $instructorTitle : 'Course instructor' }}</div>
                             @if ($instructorBio !== '')
                                 <p class="cd-inst__bio">{{ $instructorBio }}</p>
+                            @endif
+                            @if (!empty($instructorSocial))
+                                <div style="display:flex;gap:10px;margin-top:10px">
+                                    @foreach ($instructorSocial as $platform => $url)
+                                        <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ucfirst($platform) }}"
+                                            style="width:32px;height:32px;border-radius:50%;background:#f3f0f9;display:grid;place-items:center;color:var(--cd-purple)">
+                                            <i class="fa-brands fa-{{ $platform }}"></i>
+                                        </a>
+                                    @endforeach
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -1681,9 +1697,9 @@ html.cd-lock { overflow: hidden; }
                             @if ($isFree)
                                 <span class="cd-price__now is-free">Free</span>
                             @else
-                                <span class="cd-price__now">₹{{ number_format($price, 0) }}</span>
+                                <span class="cd-price__now">{{ format_price($price, 0) }}</span>
                                 @if ($hasDiscount)
-                                    <span class="cd-price__old">₹{{ number_format((float) $course->price, 0) }}</span>
+                                    <span class="cd-price__old">{{ format_price((float) $course->price, 0) }}</span>
                                     <span class="cd-price__off">{{ $discountPct }}% off</span>
                                 @endif
                             @endif
@@ -1726,8 +1742,8 @@ html.cd-lock { overflow: hidden; }
             @if ($isFree)
                 <strong>Free</strong>
             @else
-                <strong>₹{{ number_format($price, 0) }}</strong>
-                @if ($hasDiscount)<s>₹{{ number_format((float) $course->price, 0) }}</s>@endif
+                <strong>{{ format_price($price, 0) }}</strong>
+                @if ($hasDiscount)<s>{{ format_price((float) $course->price, 0) }}</s>@endif
             @endif
         </div>
 

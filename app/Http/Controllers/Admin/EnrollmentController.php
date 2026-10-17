@@ -91,7 +91,7 @@ class EnrollmentController extends BaseAdminController
     {
         return view('admin.enrollments.form', [
             'enrollment' => new Enrollment(),
-            'users' => User::where('role', '!=', 'admin')->orderBy('name')->get(['id', 'name', 'email']),
+            'users' => User::where('role', 'user')->orderBy('name')->get(['id', 'name', 'email']),
             'courses' => Course::where('status', 'active')->with(['category', 'subCategory', 'instructor'])->orderBy('title')->get([
                 'id', 'user_id', 'category_id', 'sub_category_id', 'title', 'short_description',
                 'thumbnail', 'price', 'discount_price', 'is_free', 'level', 'language', 'status',
@@ -116,7 +116,7 @@ class EnrollmentController extends BaseAdminController
     {
         return view('admin.enrollments.form', [
             'enrollment' => $enrollment,
-            'users' => User::where('role', '!=', 'admin')->orderBy('name')->get(['id', 'name', 'email']),
+            'users' => User::where('role', 'user')->orderBy('name')->get(['id', 'name', 'email']),
             'courses' => Course::where('status', 'active')->with(['category', 'subCategory', 'instructor'])->orderBy('title')->get([
                 'id', 'user_id', 'category_id', 'sub_category_id', 'title', 'short_description',
                 'thumbnail', 'price', 'discount_price', 'is_free', 'level', 'language', 'status',

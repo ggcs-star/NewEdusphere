@@ -1,4 +1,4 @@
-@props(['icon', 'color', 'count', 'label', 'change' => 0, 'direction' => 'flat', 'changeLabel' => 'from last month'])
+@props(['icon', 'color', 'count', 'label', 'change' => 0, 'direction' => 'flat', 'changeLabel' => 'from last month', 'href' => null])
 
 @php
 $palette = [
@@ -10,7 +10,8 @@ $palette = [
 $p = $palette[$color] ?? $palette['violet'];
 @endphp
 
-<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br {{ $p['bg'] }} ring-1 {{ $p['ring'] }} shadow-sm p-5">
+@if ($href)<a href="{{ $href }}" class="block">@endif
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br {{ $p['bg'] }} ring-1 {{ $p['ring'] }} shadow-sm p-5 {{ $href ? 'transition hover:shadow-md hover:-translate-y-0.5' : '' }}">
     <div class="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full {{ $p['blob'] }}"></div>
 
     <div class="relative h-11 w-11 rounded-xl {{ $p['badge'] }} text-white flex items-center justify-center shadow-sm">
@@ -40,3 +41,4 @@ $p = $palette[$color] ?? $palette['violet'];
         </span>
     </div>
 </div>
+@if ($href)</a>@endif

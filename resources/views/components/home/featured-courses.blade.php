@@ -69,11 +69,11 @@
                                 @if ($course->is_free)
                                     Free
                                 @else
-                                    <span>₹{{ number_format($course->effectivePrice(), 0) }}</span>
+                                    <span>{{ format_price($course->effectivePrice(), 0) }}</span>
 
                                     @if ($course->hasDiscount())
                                         <span class="course-old-price">
-                                            ₹{{ number_format((float) $course->price, 0) }}
+                                            {{ format_price((float) $course->price, 0) }}
                                         </span>
                                     @endif
                                 @endif

@@ -67,7 +67,7 @@ class CourseController extends BaseAdminController
         return view('admin.courses.index', [
             'courses' => $query->paginate(10)->withQueryString(),
             'categories' => Category::topLevel()->orderBy('name')->get(),
-            'instructors' => User::where('is_instructor', true)->orderBy('name')->get(),
+            'instructors' => User::where('role', 'instructor')->orderBy('name')->get(),
             'selectedStatus' => $status ?? 'all',
             'selectedCategory' => $request->get('category_id', 'all'),
             'selectedPrice' => $price,

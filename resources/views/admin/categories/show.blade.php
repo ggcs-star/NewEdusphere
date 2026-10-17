@@ -126,7 +126,7 @@
                                         @if ($course->is_free)
                                             <span class="text-emerald-600 font-semibold">Free</span>
                                         @else
-                                            ${{ number_format($course->price, 2) }}
+                                            {{ format_price($course->price) }}
                                         @endif
                                     </td>
                                     <td class="px-5 py-3.5">

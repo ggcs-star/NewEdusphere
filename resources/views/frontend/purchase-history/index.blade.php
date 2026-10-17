@@ -55,7 +55,7 @@
                                         </td>
 
                                         <td style="padding: 14px; border-bottom: 1px solid var(--border);">
-                                            ₹{{ number_format((float) ($payment->amount ?? 0), 2) }}
+                                            {{ format_price((float) ($payment->amount ?? 0)) }}
                                         </td>
 
                                         <td style="padding: 14px; border-bottom: 1px solid var(--border);">
