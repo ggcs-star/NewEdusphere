@@ -104,7 +104,19 @@
                            class="ml-continue">
                             View course <span>→</span>
                         </a>
+@php
+    $certificate = \App\Models\Certificate::where('user_id', $user->id)
+        ->where('course_id', $course->id)
+        ->first();
+@endphp
 
+@if (!empty($course->certificate_id))
+    <a href="{{ route('user.certificates.show', $course->certificate_id) }}"
+       class="ml-certificate-btn">
+        <span>🏆 View Certificate</span>
+        <span>→</span>
+    </a>
+@endif
                         <details class="ml-payment">
                             <summary>
                                 <span>Purchase details</span>
@@ -324,6 +336,27 @@
     .ml-grid { grid-template-columns:1fr; }
     .ml-image-wrap { height:205px; }
     .ml-list-heading { align-items:flex-start; }
+}
+.ml-certificate-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 12px;
+    margin-top: 9px;
+    border: 1px solid #d8c4ee;
+    border-radius: 8px;
+    background: #f5effc;
+    color: #51277d !important;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 800;
+    transition: .2s ease;
+}
+
+.ml-certificate-btn:hover {
+    background: #32105f;
+    color: #fff !important;
+    border-color: #32105f;
 }
 </style>
 @endpush
