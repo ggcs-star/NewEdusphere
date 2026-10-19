@@ -6,6 +6,7 @@ use App\Concerns\AuthorizesCourseOwnership;
 use App\Concerns\GeneratesUniqueSlugs;
 use App\Models\Category;
 use App\Models\Course;
+use App\Models\QuizAttempt;
 use App\Models\User;
 use App\Services\FileUploadService;
 use App\Services\TrendStatsService;
@@ -113,17 +114,50 @@ class CourseController extends BaseAdminController
 
     public function show(Course $course): View
     {
-        $course->load(['instructor', 'category', 'subCategory'])
+        $course->load(['instructor', 'category', 'subCategory', 'sections.lessons'])
             ->loadCount(['sections', 'lessons']);
+
+        $enrollments = $course->enrollments()
+            ->with('user')
+            ->latest()
+            ->get();
+
+        $students = $enrollments->pluck('user')->filter();
+        $enrollmentIdByUser = $enrollments->pluck('id', 'user_id');
+
+        $quizLessons = $course->sections
+            ->flatMap(fn ($section) => $section->lessons)
+            ->where('lesson_type', 'quiz')
+            ->values();
+
+        $quizScores = [];
+
+        if ($quizLessons->isNotEmpty() && $students->isNotEmpty()) {
+            $totalPossible = (int) $quizLessons->sum('total_score');
+
+            $attemptsByUser = QuizAttempt::whereIn('user_id', $students->pluck('id'))
+                ->whereIn('lesson_id', $quizLessons->pluck('id'))
+                ->get()
+                ->groupBy('user_id');
+
+            foreach ($students as $student) {
+                $userAttempts = $attemptsByUser->get($student->id, collect());
+
+                $quizScores[$student->id] = [
+                    'total_possible' => $totalPossible,
+                    'total_achieved' => (int) $userAttempts->sum('score'),
+                    'attempted_count' => $userAttempts->count(),
+                    'quiz_count' => $quizLessons->count(),
+                ];
+            }
+        }
 
         return view('admin.courses.show', [
             'course' => $course,
-            'students' => $course->enrollments()
-                ->with('user')
-                ->latest()
-                ->get()
-                ->pluck('user')
-                ->filter(),
+            'students' => $students,
+            'enrollmentIdByUser' => $enrollmentIdByUser,
+            'hasQuizzes' => $quizLessons->isNotEmpty(),
+            'quizScores' => $quizScores,
         ]);
     }
 
