@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Models\Course;
 use App\Models\Enrollment;
+use App\Models\QuizAttempt;
 use App\Models\User;
 use App\Services\TrendStatsService;
 use Illuminate\Http\RedirectResponse;
@@ -75,10 +76,40 @@ class EnrollmentController extends BaseAdminController
 
     public function show(Enrollment $enrollment): View
     {
-        $enrollment->load(['user', 'course.category', 'course.subCategory', 'course.instructor']);
+        $enrollment->load([
+            'user',
+            'course.category',
+            'course.subCategory',
+            'course.instructor',
+            'course.sections.lessons',
+        ]);
+
+        $quizLessons = collect();
+        if ($enrollment->course) {
+            $quizLessons = $enrollment->course->sections
+                ->flatMap(fn ($section) => $section->lessons)
+                ->where('lesson_type', 'quiz')
+                ->values();
+        }
+
+        $attemptsByLesson = QuizAttempt::where('user_id', $enrollment->user_id)
+            ->whereIn('lesson_id', $quizLessons->pluck('id'))
+            ->get()
+            ->keyBy('lesson_id');
+
+        $quizPerformance = $quizLessons->map(function ($lesson) use ($attemptsByLesson) {
+            $attempt = $attemptsByLesson->get($lesson->id);
+
+            return [
+                'lesson' => $lesson,
+                'attempt' => $attempt,
+                'review' => $attempt ? $attempt->setRelation('lesson', $lesson)->review() : null,
+            ];
+        })->values();
 
         return view('admin.enrollments.show', [
             'enrollment' => $enrollment,
+            'quizPerformance' => $quizPerformance,
             'otherEnrollments' => Enrollment::where('user_id', $enrollment->user_id)
                 ->where('id', '!=', $enrollment->id)
                 ->with('course.category')

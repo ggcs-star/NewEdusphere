@@ -186,6 +186,9 @@
                                 <th class="px-5 py-3">Student</th>
                                 <th class="px-5 py-3">Email</th>
                                 <th class="px-5 py-3">Status</th>
+                                @if ($hasQuizzes)
+                                    <th class="px-5 py-3">Quiz Score</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -206,6 +209,26 @@
                                             {{ $student->status ? 'Active' : 'Suspended' }}
                                         </x-admin.badge>
                                     </td>
+                                    @if ($hasQuizzes)
+                                        <td class="px-5 py-3.5">
+                                            @php $qs = $quizScores[$student->id] ?? null; @endphp
+                                            @if ($qs && $qs['attempted_count'] > 0)
+                                                <a href="{{ route('admin.enrollments.show', $enrollmentIdByUser[$student->id]) }}"
+                                                    class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition">
+                                                    <i class="fa-solid fa-circle-question text-[10px]"></i>
+                                                    {{ $qs['total_achieved'] }} / {{ $qs['total_possible'] }} pts
+                                                    <span class="font-medium text-emerald-500">({{ $qs['attempted_count'] }}/{{ $qs['quiz_count'] }} quizzes)</span>
+                                                </a>
+                                            @elseif (isset($enrollmentIdByUser[$student->id]))
+                                                <a href="{{ route('admin.enrollments.show', $enrollmentIdByUser[$student->id]) }}"
+                                                    class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-200 transition">
+                                                    Not attempted
+                                                </a>
+                                            @else
+                                                <span class="text-xs text-slate-400">—</span>
+                                            @endif
+                                        </td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>
