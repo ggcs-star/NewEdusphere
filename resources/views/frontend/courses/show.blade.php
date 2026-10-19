@@ -863,6 +863,69 @@ $isCourseUnlocked = (bool) (
     var current = -1;
     var lastFocus = null;
     var closeTimer = null;
+    var courseCertificateUrl = null;
+    var certificateStatusUrl = @json(
+    route('courses.certificate-status', $course->id)
+);
+
+fetch(certificateStatusUrl, {
+    headers: {
+        'Accept': 'application/json'
+    },
+    credentials: 'same-origin',
+    cache: 'no-store'
+})
+.then(function (response) {
+    if (!response.ok) {
+        throw new Error('Certificate status request failed: ' + response.status);
+    }
+
+    return response.json();
+})
+.then(function (data) {
+    if (data.issued && data.certificate_url) {
+        setCourseCertificateUrl(data.certificate_url);
+    }
+})
+.catch(function (error) {
+    console.error('Certificate status error:', error);
+});
+
+    function setCourseCertificateUrl(url) {
+        if (typeof url !== 'string' || !url.trim()) return;
+        courseCertificateUrl = url.trim();
+
+        // The footer only becomes a certificate action on the final lesson.
+        if (current === lessons.length - 1) {
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = '<span>View Certificate</span>' + ICON.right;
+            nextBtn.setAttribute('aria-label', 'View Certificate');
+            nextBtn.dataset.certificateUrl = courseCertificateUrl;
+        }
+    }
+
+    function updateLessonNavigation(index) {
+        var isLastLesson = index === lessons.length - 1;
+        prevBtn.disabled = index === 0;
+
+        if (isLastLesson) {
+            // Always show the certificate action on the final lesson.
+            // If the backend has already returned a URL, attach it for navigation.
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = '<span>View Certificate</span>' + ICON.right;
+            nextBtn.setAttribute('aria-label', 'View Certificate');
+            if (courseCertificateUrl) {
+                nextBtn.dataset.certificateUrl = courseCertificateUrl;
+            } else {
+                delete nextBtn.dataset.certificateUrl;
+            }
+        } else {
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = '<span>Next</span>' + ICON.right;
+            nextBtn.removeAttribute('aria-label');
+            delete nextBtn.dataset.certificateUrl;
+        }
+    }
 
     function el(tagName, className, text) {
         var n = document.createElement(tagName);
@@ -890,6 +953,11 @@ $isCourseUnlocked = (bool) (
     var progressTimer = null;
     var youtubePlayer = null;
     var youtubePlayerReady = false;  // true only after the saved position was restored
+    var ytSeekTimer = null;          // polls the YouTube player to detect forward seeks
+    var ytLastPos = null;            // last polled YouTube position (seconds)
+    var ytLastTick = 0;              // wall-clock time of the last poll (ms)
+    var vimeoPlayer = null;          // Vimeo.Player instance
+    var vimeoState = null;           // {ready, pos, duration, lastPos, lastTick, lastSave}
     var activeVideo = null;          // {el, ready} for uploaded videos
     var progressToken = 0;           // changes on every lesson open/close; stale async work is ignored
     var docToken = 0;                // changes on every document render; stale fetch checks are ignored
@@ -949,48 +1017,116 @@ $isCourseUnlocked = (bool) (
             });
     }
 
-    function saveProgress(position, duration, completed) {
-        if (!activeProgress || !activeProgress.saveUrl || !activeProgress.lessonId) {
-            console.error('Progress URL or lesson ID missing:', activeProgress);
-            return;
-        }
-        if (activeProgress.disabled) return;
 
-        position = Math.max(0, Math.floor(Number(position) || 0));
-        duration = Math.max(0, Math.floor(Number(duration) || 0));
-
-        // Unknown duration: never send (server would clamp the position to 0).
-        if (duration <= 0) return;
-        position = Math.min(position, duration);
-
-        if (completed) activeProgress.completed = true;
-        updateProgressUI(position, duration, activeProgress.completed);
-
-        var url = activeProgress.saveUrl;
-
-        fetch(url, {
-            method: 'POST',
-            headers: progressHeaders(),
-            body: JSON.stringify({position: position, duration: duration, completed: !!completed}),
-            credentials: 'same-origin',
-            keepalive: true
-        })
-        .then(function (response) {
-            return response.text().then(function (text) {
-                var data;
-                try { data = JSON.parse(text); } catch (e) { data = {message: text}; }
-
-                if (!response.ok) {
-                    console.error('Progress save failed:', response.status, data);
-                    return;
-                }
-                console.debug('Progress saved:', data);
-            });
-        })
-        .catch(function (error) {
-            console.error('Progress request error:', url, error);
-        });
+function saveProgress(
+    position,
+    duration,
+    completed,
+    seekFrom = null,
+    seekTo = null
+) {
+    if (
+        !activeProgress ||
+        !activeProgress.saveUrl ||
+        !activeProgress.lessonId
+    ) {
+        console.error('Progress URL or lesson ID missing:', activeProgress);
+        return;
     }
+
+    if (activeProgress.disabled) return;
+
+    position = Math.max(0, Math.floor(Number(position) || 0));
+    duration = Math.max(0, Math.floor(Number(duration) || 0));
+
+    if (duration <= 0) return;
+
+    position = Math.min(position, duration);
+
+    var payload = {
+        position: position,
+        duration: duration,
+        completed: !!completed
+    };
+
+    if (
+        seekFrom !== null &&
+        seekTo !== null &&
+        Number.isFinite(Number(seekFrom)) &&
+        Number.isFinite(Number(seekTo))
+    ) {
+        var from = Math.max(
+            0,
+            Math.min(Math.floor(Number(seekFrom)), duration)
+        );
+
+        var to = Math.max(
+            0,
+            Math.min(Math.floor(Number(seekTo)), duration)
+        );
+
+        if (to > from && Math.abs(position - to) <= 2) {
+            payload.seek_from = from;
+            payload.seek_to = to;
+        }
+    }
+
+    if (completed) {
+        activeProgress.completed = true;
+    }
+
+    updateProgressUI(
+        position,
+        duration,
+        activeProgress.completed
+    );
+
+    var url = activeProgress.saveUrl;
+
+    fetch(url, {
+        method: 'POST',
+        headers: progressHeaders(),
+        body: JSON.stringify(payload),
+        credentials: 'same-origin',
+        keepalive: true
+    })
+    .then(function (response) {
+        return response.text().then(function (text) {
+            var data;
+
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                data = { message: text };
+            }
+
+            if (!response.ok) {
+                console.error(
+                    'Progress save failed:',
+                    response.status,
+                    data
+                );
+                return;
+            }
+
+            console.debug('Progress saved:', data);
+
+            // Completion endpoint may issue/retrieve the certificate when every
+            // lesson (video/document/quiz) has been completed.
+            var certificateUrl = data.certificate_url ||
+                (data.data && data.data.certificate_url) ||
+                (data.progress && data.progress.certificate_url);
+
+            if (payload.completed && certificateUrl) {
+                setCourseCertificateUrl(certificateUrl);
+            }
+        });
+    })
+    .catch(function (error) {
+        console.error('Progress request error:', url, error);
+    });
+}
+
 
     // Save the current playback position (YouTube or uploaded video).
     function flushProgress() {
@@ -1000,6 +1136,8 @@ $isCourseUnlocked = (bool) (
                 saveProgress(youtubePlayer.getCurrentTime(), youtubePlayer.getDuration(), false);
             } else if (activeVideo && activeVideo.ready && activeVideo.el.duration) {
                 saveProgress(activeVideo.el.currentTime, activeVideo.el.duration, false);
+            } else if (vimeoState && vimeoState.ready && vimeoState.duration > 0) {
+                saveProgress(vimeoState.pos, vimeoState.duration, false);
             }
         } catch (e) {
             console.error('Could not save progress before leaving the lesson:', e);
@@ -1016,6 +1154,15 @@ $isCourseUnlocked = (bool) (
         }
         youtubePlayer = null;
         youtubePlayerReady = false;
+        clearInterval(ytSeekTimer);
+        ytSeekTimer = null;
+        ytLastPos = null;
+        ytLastTick = 0;
+        if (vimeoPlayer) {
+            try { vimeoPlayer.destroy(); } catch (e) { console.error('Could not destroy Vimeo player:', e); }
+        }
+        vimeoPlayer = null;
+        vimeoState = null;
         activeVideo = null;
         progressToken++;
         activeProgress = null;
@@ -1086,6 +1233,138 @@ $isCourseUnlocked = (bool) (
         document.head.appendChild(script);
     }
 
+    // The YouTube iframe API has no "seeked" event, so detect forward seeks by
+    // polling: if the position moved further than normal playback could explain,
+    // report it to the backend as a forward seek (seek_from -> seek_to).
+    function startYouTubeSeekWatcher(token) {
+        clearInterval(ytSeekTimer);
+        ytSeekTimer = setInterval(function () {
+            if (
+                !isCurrentProgress(token) || !youtubePlayer || !youtubePlayerReady ||
+                typeof youtubePlayer.getCurrentTime !== 'function'
+            ) return;
+
+            var now = Date.now();
+            var pos = Number(youtubePlayer.getCurrentTime());
+            var dur = Number(youtubePlayer.getDuration());
+            if (!Number.isFinite(pos) || !Number.isFinite(dur) || dur <= 0) return;
+
+            if (ytLastPos !== null) {
+                var wall = Math.max(0, (now - ytLastTick) / 1000);
+                var rate = 1;
+                try { rate = Number(youtubePlayer.getPlaybackRate()) || 1; } catch (e) { rate = 1; }
+                var playing = youtubePlayer.getPlayerState() === YT.PlayerState.PLAYING;
+                var expected = ytLastPos + (playing ? wall * rate : 0);
+
+                // Detect a genuine forward jump while allowing for normal playback jitter.
+                // Keep this threshold low enough to capture ordinary manual timeline seeks.
+                if (pos - expected > 1.25 && pos > ytLastPos + 1.25) {
+                    saveProgress(pos, dur, false, ytLastPos, pos);
+                }
+            }
+
+            ytLastPos = pos;
+            ytLastTick = now;
+        }, 500);
+    }
+
+    function loadVimeoApi(callback) {
+        if (window.Vimeo && window.Vimeo.Player) { callback(); return; }
+
+        var existing = document.getElementById('vimeoPlayerApi');
+        if (existing) { existing.addEventListener('load', callback, {once: true}); return; }
+
+        var script = document.createElement('script');
+        script.id = 'vimeoPlayerApi';
+        script.src = 'https://player.vimeo.com/api/player.js';
+        script.async = true;
+        script.onload = callback;
+        script.onerror = function () { console.error('Failed to load the Vimeo Player API.'); };
+        document.head.appendChild(script);
+    }
+
+    function startVimeoProgress(iframe, saved, token) {
+        loadVimeoApi(function () {
+            if (!isCurrentProgress(token) || !iframe || !iframe.isConnected) return;
+
+            var player;
+            try {
+                player = new Vimeo.Player(iframe);
+            } catch (error) {
+                console.error('Vimeo player initialization failed:', error);
+                return;
+            }
+
+            vimeoPlayer = player;
+            var st = {ready: false, pos: 0, duration: saved.duration || 0, lastPos: null, lastTick: 0, lastSave: 0};
+            vimeoState = st;
+
+            player.getDuration().then(function (d) {
+                st.duration = Math.floor(d || 0) || st.duration;
+                var pos = saved.position;
+                if (pos > 0 && st.duration > 0 && pos < st.duration - 2) {
+                    return player.setCurrentTime(pos).then(function () { return pos; }, function () { return 0; });
+                }
+                return 0;
+            }).then(function (pos) {
+                if (!isCurrentProgress(token) || vimeoState !== st) return;
+                st.pos = pos || 0;
+                st.lastPos = st.pos;
+                st.lastTick = Date.now();
+                st.ready = true;   // saving allowed only after restore
+                updateProgressUI(st.pos, st.duration, saved.completed);
+            }).catch(function (error) {
+                console.error('Could not start Vimeo progress tracking:', error);
+            });
+
+            player.on('timeupdate', function (d) {
+                if (!st.ready || !isCurrentProgress(token) || vimeoState !== st) return;
+
+                var now = Date.now();
+                var pos = Number(d.seconds) || 0;
+                st.duration = Math.floor(d.duration || 0) || st.duration;
+                if (st.duration <= 0) return;
+
+                var wall = Math.max(0, (now - st.lastTick) / 1000);
+                // Vimeo emits timeupdate rather than a dedicated seeked event.
+                // Compare against elapsed wall time so normal playback isn't mistaken for a seek.
+                var jumped = st.lastPos !== null &&
+                    (pos - st.lastPos) > (wall * 1.5 + 1.25) &&
+                    pos > st.lastPos + 1.25;
+
+                st.pos = pos;
+                updateProgressUI(pos, st.duration, activeProgress.completed);
+
+                if (jumped) {
+                    saveProgress(pos, st.duration, false, st.lastPos, pos);
+                    st.lastSave = now;
+                } else if (now - st.lastSave >= 5000) {
+                    st.lastSave = now;
+                    saveProgress(pos, st.duration, false);
+                }
+
+                st.lastPos = pos;
+                st.lastTick = now;
+            });
+
+            player.on('pause', function () {
+                if (st.ready && isCurrentProgress(token) && st.duration > 0) {
+                    saveProgress(st.pos, st.duration, false);
+                    st.lastSave = Date.now();
+                }
+            });
+
+            player.on('ended', function () {
+                if (!st.ready || !isCurrentProgress(token) || st.duration <= 0) return;
+                var d = st.duration;
+                var tailFrom = (st.lastPos !== null && st.lastPos < d - 1) ? st.lastPos : null;
+                saveProgress(d, d, true, tailFrom, tailFrom !== null ? d : null);
+                st.lastPos = d;
+                st.lastTick = Date.now();
+            });
+        });
+    }
+
     function startYouTubeProgress(iframe, saved, token) {
         loadYouTubeApi(function () {
             if (!isCurrentProgress(token) || !iframe || !iframe.isConnected) return;
@@ -1110,6 +1389,11 @@ $isCourseUnlocked = (bool) (
                             youtubePlayerReady = true;   // saving allowed only after restore
                             updateProgressUI(position, duration, saved.completed);
 
+                            // Baseline for seek detection = the restored position.
+                            ytLastPos = position;
+                            ytLastTick = Date.now();
+                            startYouTubeSeekWatcher(token);
+
                             clearInterval(progressTimer);
                             progressTimer = setInterval(function () {
                                 if (
@@ -1125,8 +1409,12 @@ $isCourseUnlocked = (bool) (
                             if (!isCurrentProgress(token) || !youtubePlayerReady) return;
 
                             if (event.data === YT.PlayerState.ENDED) {
-                                var d = event.target.getDuration();
-                                saveProgress(d, d, true);
+                                var d = Math.floor(event.target.getDuration() || 0);
+                                // Report the tail [lastPos -> end] so the final stretch is covered.
+                                var tailFrom = (ytLastPos !== null && ytLastPos < d - 1) ? ytLastPos : null;
+                                saveProgress(d, d, true, tailFrom, tailFrom !== null ? d : null);
+                                ytLastPos = d;
+                                ytLastTick = Date.now();
                             } else if (event.data === YT.PlayerState.PAUSED) {
                                 saveProgress(event.target.getCurrentTime(), event.target.getDuration(), false);
                             }
@@ -1143,98 +1431,281 @@ $isCourseUnlocked = (bool) (
         });
     }
 
-    function renderVideo(url, vtype) {
-        screen.replaceChildren();
-        screen.className = 'cd-screen';
-        if (!url) { setNote('No video has been added for this lesson yet.', true); return; }
-        var type = guessVideoType(vtype, url), src = '';
-        if (type === 'youtube') {
-            src = youtubeEmbed(url);
 
-            if (!src) {
-                setNote('This YouTube video URL is not valid.', true);
+
+function renderVideo(url, vtype) {
+    screen.replaceChildren();
+    screen.className = 'cd-screen';
+
+    if (!url) {
+        setNote('No video has been added for this lesson yet.', true);
+        return;
+    }
+
+    var type = guessVideoType(vtype, url);
+    var src = '';
+
+    if (type === 'youtube') {
+        src = youtubeEmbed(url);
+
+        if (!src) {
+            setNote('This YouTube video URL is not valid.', true);
+            return;
+        }
+
+        screen.appendChild(el('div', 'cd-loader'));
+
+        var iframe = document.createElement('iframe');
+        iframe.src = src;
+        iframe.title = 'Lesson video player';
+        iframe.allow =
+            'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share';
+        iframe.allowFullscreen = true;
+
+        iframe.addEventListener('load', function () {
+            var loader = screen.querySelector('.cd-loader');
+            if (loader) loader.remove();
+        });
+
+        screen.appendChild(iframe);
+
+        var ytPending = startProgress(window.currentLessonData || {});
+        var ytToken = activeProgress ? activeProgress.token : 0;
+
+        ytPending
+            .then(function (saved) {
+                if (!saved || !isCurrentProgress(ytToken)) return;
+                startYouTubeProgress(iframe, saved, ytToken);
+            })
+            .catch(function (error) {
+                console.error('Could not start YouTube progress tracking:', error);
+            });
+
+        return;
+    }
+
+    if (type === 'vimeo') {
+        src = vimeoEmbed(url);
+
+        if (!src) {
+            setNote('This Vimeo video URL is not valid.', true);
+            return;
+        }
+
+        var vimeoFrame = document.createElement('iframe');
+        vimeoFrame.src = src;
+        vimeoFrame.title = 'Lesson video player';
+        vimeoFrame.allow = 'autoplay; fullscreen; picture-in-picture';
+        vimeoFrame.allowFullscreen = true;
+
+        screen.appendChild(vimeoFrame);
+
+        var vmPending = startProgress(window.currentLessonData || {});
+        var vmToken = activeProgress ? activeProgress.token : 0;
+
+        vmPending
+            .then(function (saved) {
+                if (!saved || !isCurrentProgress(vmToken)) return;
+                startVimeoProgress(vimeoFrame, saved, vmToken);
+            })
+            .catch(function (error) {
+                console.error('Could not start Vimeo progress tracking:', error);
+            });
+
+        return;
+    }
+
+    // Uploaded video
+    var video = document.createElement('video');
+
+    video.src = url;
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+
+    video.addEventListener('error', function () {
+        setNote('This video could not be loaded.', true);
+    });
+
+    screen.appendChild(video);
+
+    var vState = {
+        el: video,
+        ready: false
+    };
+
+    var vPending = startProgress(window.currentLessonData || {});
+    var vToken = activeProgress ? activeProgress.token : 0;
+
+    var lastStablePosition = 0;
+    var seekStartPosition = null;
+    var progressSaveTimer = null;
+
+    activeVideo = vState;
+
+    // Restore saved playback position.
+    vPending.then(function (saved) {
+        if (!saved || !isCurrentProgress(vToken) || !video.isConnected) {
+            return;
+        }
+
+        function applyResume() {
+            if (!isCurrentProgress(vToken) || !video.isConnected) {
                 return;
             }
 
-            screen.appendChild(el('div', 'cd-loader'));
+            var d = video.duration;
+            var pos = Number(saved.position) || 0;
 
-            var iframe = document.createElement('iframe');
-            iframe.src = src;
-            iframe.title = 'Lesson video player';
-            iframe.allow =
-                'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share';
-            iframe.allowFullscreen = true;
-
-            iframe.addEventListener('load', function () {
-                var loader = screen.querySelector('.cd-loader');
-                if (loader) loader.remove();
-            });
-
-            screen.appendChild(iframe);
-
-            var ytPending = startProgress(window.currentLessonData || {});
-            var ytToken = activeProgress ? activeProgress.token : 0;
-
-            ytPending
-                .then(function (saved) {
-                    // null = stale lesson or fetch failed (already logged); video still plays.
-                    if (!saved || !isCurrentProgress(ytToken)) return;
-                    startYouTubeProgress(iframe, saved, ytToken);
-                })
-                .catch(function (error) {
-                    console.error('Could not start YouTube progress tracking:', error);
-                });
-
-            return;
-        }
-        else if (type === 'vimeo') {
-            src = vimeoEmbed(url);
-            if (!src) { setNote('This Vimeo video URL is not valid.', true); return; }
-            var vimeoFrame = document.createElement('iframe'); vimeoFrame.src = src; vimeoFrame.title = 'Lesson video player';
-            vimeoFrame.allow = 'autoplay; fullscreen; picture-in-picture'; vimeoFrame.allowFullscreen = true;
-            screen.appendChild(vimeoFrame);
-            startProgress(window.currentLessonData || {});
-            progressTime.textContent = 'Progress tracking is available for YouTube and uploaded videos.';
-            return;
-        }
-
-        // Uploaded / local video.
-        var video = document.createElement('video');
-        video.src = url; video.controls = true; video.playsInline = true; video.preload = 'metadata';
-        video.addEventListener('error', function(){ setNote('This video could not be loaded.', true); });
-        screen.appendChild(video);
-
-        var vState = {el: video, ready: false};
-        var vPending = startProgress(window.currentLessonData || {});
-        var vToken = activeProgress ? activeProgress.token : 0;
-        activeVideo = vState;
-
-        vPending.then(function (saved) {
-            if (!saved || !isCurrentProgress(vToken) || !video.isConnected) return;
-
-            function applyResume() {
-                if (!isCurrentProgress(vToken)) return;
-                var d = video.duration;
-                var pos = saved.position;
-                if (pos > 0 && isFinite(d) && pos < d - 2) video.currentTime = pos; else pos = 0;
-                vState.ready = true;   // saving allowed only after restore
-                updateProgressUI(pos, isFinite(d) ? d : 0, saved.completed);
-                var p = video.play();
-                if (p && p.catch) p.catch(function (err) { console.warn('Video autoplay was blocked:', err); });
+            if (pos > 0 && Number.isFinite(d) && pos < d - 2) {
+                video.currentTime = pos;
+            } else {
+                pos = 0;
             }
 
-            // loadedmetadata may already have fired while progress was loading.
-            if (video.readyState >= 1) applyResume();
-            else video.addEventListener('loadedmetadata', applyResume, {once: true});
-        }).catch(function (error) {
-            console.error('Could not restore uploaded video progress:', error);
-        });
+            lastStablePosition = pos;
+            seekStartPosition = null;
+            vState.ready = true;
 
-        video.addEventListener('timeupdate', function(){ if (vState.ready && video.duration) updateProgressUI(video.currentTime, video.duration, activeProgress ? activeProgress.completed : false); });
-        video.addEventListener('pause', function(){ if (vState.ready && video.duration && !video.ended) saveProgress(video.currentTime, video.duration, false); });
-        video.addEventListener('ended', function(){ if (vState.ready) saveProgress(video.duration, video.duration, true); });
-        progressTimer = setInterval(function(){ if (vState.ready && isCurrentProgress(vToken) && !video.paused && video.duration) saveProgress(video.currentTime, video.duration, false); }, 5000);
-    }
+            updateProgressUI(
+                pos,
+                Number.isFinite(d) ? d : 0,
+                !!saved.completed
+            );
+
+            var playPromise = video.play();
+
+            if (playPromise && playPromise.catch) {
+                playPromise.catch(function (err) {
+                    console.warn('Video autoplay was blocked:', err);
+                });
+            }
+        }
+
+        if (video.readyState >= 1) {
+            applyResume();
+        } else {
+            video.addEventListener('loadedmetadata', applyResume, {
+                once: true
+            });
+        }
+    }).catch(function (error) {
+        console.error('Could not restore uploaded video progress:', error);
+    });
+
+    // Update UI and keep the last stable playback position.
+    video.addEventListener('timeupdate', function () {
+        if (!vState.ready || !Number.isFinite(video.duration)) return;
+
+        updateProgressUI(
+            video.currentTime,
+            video.duration,
+            activeProgress ? activeProgress.completed : false
+        );
+
+        if (!video.seeking && seekStartPosition === null) {
+            lastStablePosition = video.currentTime;
+        }
+    });
+
+    // Record the position before a seek.
+    video.addEventListener('seeking', function () {
+        if (!vState.ready) return;
+
+        if (seekStartPosition === null) {
+            seekStartPosition = lastStablePosition;
+        }
+    });
+
+    // Report forward seeks to the backend.
+    video.addEventListener('seeked', function () {
+        if (!vState.ready || !Number.isFinite(video.duration)) return;
+
+        var from = seekStartPosition;
+        var to = video.currentTime;
+
+        seekStartPosition = null;
+        lastStablePosition = to;
+
+        if (
+            from !== null &&
+            Number.isFinite(from) &&
+            Number.isFinite(to) &&
+            to > from + 1
+        ) {
+            console.debug('Video forward seek:', {
+                from: from,
+                to: to
+            });
+
+            saveProgress(
+                to,
+                video.duration,
+                false,
+                from,
+                to
+            );
+        }
+    });
+
+    // Save progress when paused.
+    video.addEventListener('pause', function () {
+        if (
+            vState.ready &&
+            Number.isFinite(video.duration) &&
+            !video.ended
+        ) {
+            saveProgress(
+                video.currentTime,
+                video.duration,
+                false
+            );
+        }
+    });
+
+    // Save the final position when playback ends.
+    video.addEventListener('ended', function () {
+        if (vState.ready && Number.isFinite(video.duration)) {
+            var vd = Math.floor(video.duration);
+            var vTail = (lastStablePosition < vd - 1) ? lastStablePosition : null;
+
+            saveProgress(
+                vd,
+                vd,
+                true,
+                vTail,
+                vTail !== null ? vd : null
+            );
+        }
+    });
+
+    // Periodically save normal playback progress.
+    progressSaveTimer = setInterval(function () {
+        if (
+            vState.ready &&
+            isCurrentProgress(vToken) &&
+            !video.paused &&
+            !video.seeking &&
+            Number.isFinite(video.duration)
+        ) {
+            saveProgress(
+                video.currentTime,
+                video.duration,
+                false
+            );
+        }
+    }, 5000);
+
+    // Stop the timer when the video element is removed.
+    var cleanupTimer = setInterval(function () {
+        if (!video.isConnected) {
+            clearInterval(progressSaveTimer);
+            clearInterval(cleanupTimer);
+        }
+    }, 1000);
+}
+
+
 
 function renderDocument(data) {
     var myToken = ++docToken;
@@ -1250,25 +1721,46 @@ function renderDocument(data) {
     var loader = el('div', 'cd-loader');
     screen.appendChild(loader);
 
-    fetch(data.attachment, { method: 'HEAD' }).then(function (res) {
-        if (myToken !== docToken) return;
-        if (!res.ok) { setNote('No document is available for this lesson yet.', true); return; }
+    fetch(data.attachment, { method: 'HEAD' })
+        .then(function (res) {
+            if (myToken !== docToken) return;
 
-        screen.replaceChildren();
-        screen.className = 'cd-screen cd-screen--document';
+            if (!res.ok) {
+                setNote('No document is available for this lesson yet.', true);
+                return;
+            }
 
-        var iframe = document.createElement('iframe');
-        iframe.src = data.attachment;
-        iframe.title = data.attname || data.title || 'Course document';
-        iframe.setAttribute('loading', 'lazy');
-        iframe.setAttribute('allowfullscreen', 'true');
+            screen.replaceChildren();
+            screen.className = 'cd-screen cd-screen--document';
 
-        screen.appendChild(iframe);
-    }).catch(function () {
-        if (myToken !== docToken) return;
-        setNote('No document is available for this lesson yet.', true);
-    });
+            var iframe = document.createElement('iframe');
+            iframe.src = data.attachment;
+            iframe.title = data.attname || data.title || 'Course document';
+            iframe.setAttribute('loading', 'lazy');
+            iframe.setAttribute('allowfullscreen', 'true');
+
+            screen.appendChild(iframe);
+
+            // Save progress only after the document resource is confirmed.
+            if (
+                !activeProgress ||
+                String(activeProgress.lessonId) !== String(data.id) ||
+                !activeProgress.saveUrl
+            ) {
+                console.warn('Document progress URL is unavailable.', data.id);
+                return;
+            }
+
+            saveProgress(1, 1, true);
+        })
+        .catch(function (error) {
+            if (myToken !== docToken) return;
+
+            console.error('Document loading failed:', error);
+            setNote('No document is available for this lesson yet.', true);
+        });
 }
+
 
     /* =====================================================
        Quiz
@@ -1479,10 +1971,15 @@ function renderDocument(data) {
                     .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
                     .then(function (res) {
                         if (!res.data || !res.data.result) { setNote('This quiz could not be submitted. Please try again.', true); return; }
+                        if (res.data.certificate_url) {
+                            setCourseCertificateUrl(res.data.certificate_url);
+                        }
+
                         buildResultScreen(res.data.result, {
                             allowRetry: !!res.data.allow_retry,
                             onRetry: res.data.allow_retry ? function () { loadQuiz(showUrl + (showUrl.indexOf('?') === -1 ? '?' : '&') + 'retry=1'); } : null,
                             alreadySubmitted: !res.ok,
+                            certificateUrl: res.data.certificate_url || null
                         });
                     })
                     .catch(function () { setNote('This quiz could not be submitted. Please try again.', true); });
@@ -1532,6 +2029,11 @@ function renderDocument(data) {
                 cont.innerHTML = '<span>Next lesson</span>' + ICON.right;
                 cont.addEventListener('click', function () { nextBtn.click(); });
                 actions.appendChild(cont);
+            } else if (opts.certificateUrl || courseCertificateUrl) {
+                var certificateLink = el('a', 'cd-btn cd-btn--gold cd-btn--sm');
+                certificateLink.href = opts.certificateUrl || courseCertificateUrl;
+                certificateLink.innerHTML = '<span>View Certificate</span>' + ICON.right;
+                actions.appendChild(certificateLink);
             }
             res.appendChild(actions);
 
@@ -1663,14 +2165,27 @@ function renderDocument(data) {
         tag.textContent = KIND_LABEL[kind] || 'Lesson';
         title.textContent = data.title;
         count.textContent = 'Lesson ' + (index + 1) + ' of ' + lessons.length;
-        prevBtn.disabled = index === 0;
-        nextBtn.disabled = index === lessons.length - 1;
+        updateLessonNavigation(index);
 
         window.currentLessonData = data;
-     
+
 
 if (kind === 'video') {
     renderVideo(data.url, data.vtype);
+} else if (kind === 'document') {
+    // Initialize progress state and load saved progress first.
+    startProgress(data).then(function (saved) {
+        if (!activeProgress ||
+            String(activeProgress.lessonId) !== String(data.id)) {
+            return;
+        }
+
+        if (progressShow) {
+            progressShow.hidden = false;
+        }
+
+        renderDocument(data);
+    });
 } else {
     clearInterval(progressTimer);
     activeProgress = null;
@@ -1681,8 +2196,6 @@ if (kind === 'video') {
 
     if (kind === 'quiz') {
         renderQuiz(btn);
-    } else {
-        renderDocument(data);
     }
 }
 
@@ -1744,7 +2257,17 @@ if (kind === 'video') {
         if (e.target.closest('[data-close]')) closeModal();
     });
     prevBtn.addEventListener('click', function () { if (current > 0) render(current - 1); });
-    nextBtn.addEventListener('click', function () { if (current < lessons.length - 1) render(current + 1); });
+    nextBtn.addEventListener('click', function () {
+        if (current === lessons.length - 1) {
+            if (courseCertificateUrl) {
+                window.location.href = courseCertificateUrl;
+            } else {
+                setNote('Your certificate is not available yet. Please make sure all course lessons are completed and try again.', true);
+            }
+            return;
+        }
+        if (current < lessons.length - 1) render(current + 1);
+    });
 
     document.addEventListener('keydown', function (e) {
         if (modal.hidden) return;

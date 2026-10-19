@@ -27,23 +27,24 @@ class CertificateIssuanceService
             }
 
             // Student must be enrolled.
-            $enrolled = DB::table('enrollments')
-                ->where('user_id', $userId)
-                ->where('course_id', $courseId)
-                ->exists();
+           // Load course and lessons first.
+$course = Course::with('sections.lessons')
+    ->find($courseId);
 
-            if (! $enrolled) {
-                return null;
-            }
+if (! $course) {
+    return null;
+}
 
-            // Load course and lessons.
-            $course = Course::with('sections.lessons')
-                ->find($courseId);
+// Student must be enrolled unless the course is free.
+$enrolled = (bool) $course->is_free
+    || DB::table('enrollments')
+        ->where('user_id', $userId)
+        ->where('course_id', $courseId)
+        ->exists();
 
-            if (! $course) {
-                return null;
-            }
-
+if (! $enrolled) {
+    return null;
+}
             // Course must have an assigned active template.
             $templateId = $course->certificate_template_id;
 

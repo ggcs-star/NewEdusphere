@@ -1259,6 +1259,10 @@
                             <span>♡</span> Browse Courses
                         </a>
 
+<a href="{{ route('user.certificates.index') }}" class="account-menu-item">
+    <span>🏆</span> My Certificate
+</a>
+
                         <a href="{{ route('purchase-history.index') }}" class="account-menu-item">
                             <span>🛒</span> Purchase History
                         </a>
