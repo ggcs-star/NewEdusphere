@@ -296,7 +296,10 @@ Route::middleware('web.auth')->group(function () {
     | My Courses
     |--------------------------------------------------------------------------
     */
-
+Route::get(
+    '/courses/{courseId}/certificate-status',
+    [\App\Http\Controllers\Frontend\LessonProgressController::class, 'certificateStatus']
+)->name('courses.certificate-status');
     Route::get('/my-courses', [
         MyCoursesController::class,
         'index',

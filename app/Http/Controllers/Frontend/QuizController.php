@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
+use App\Services\CertificateIssuanceService;
 
 class QuizController extends Controller
 {
@@ -84,246 +85,304 @@ class QuizController extends Controller
      * Return quiz questions without correct answers.
      * If the quiz was already submitted, return its saved result.
      */
-    public function show(Request $request, int $courseId, int $lessonId): JsonResponse
-    {
-        $viewer = $this->viewer();
+  public function show(Request $request, int $courseId, int $lessonId): JsonResponse
+{
+    $viewer = $this->viewer();
 
-        [, $lesson] = $this->accessibleLesson(
+    [$course, $lesson] = $this->accessibleLesson(
+        $courseId,
+        $lessonId,
+        $viewer
+    );
+
+    $attempt = QuizAttempt::where('user_id', $viewer->id)
+        ->where('lesson_id', $lesson->id)
+        ->first();
+
+    // A retry is allowed only when enabled and explicitly requested.
+    $wantsRetry = $attempt
+        && $lesson->allow_retry
+        && $request->boolean('retry');
+
+    // Check whether a certificate has been issued or can now be issued.
+    $certificateUrl = null;
+
+    try {
+        $certificate = app(CertificateIssuanceService::class)
+            ->issueIfEligible((int) $viewer->id, (int) $course->id);
+
+        if ($certificate) {
+            $certificateUrl = route(
+                'user.certificates.show',
+                $certificate->id
+            );
+        }
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::error(
+            'Certificate check failed in quiz show',
+            [
+                'user_id' => $viewer->id,
+                'course_id' => $course->id,
+                'exception' => $e->getMessage(),
+            ]
+        );
+    }
+
+    if ($attempt && ! $wantsRetry) {
+        return response()->json([
+            'submitted' => true,
+            'allow_retry' => (bool) $lesson->allow_retry,
+            'result' => $this->resultData($attempt, $lesson),
+            'retry_url' => $lesson->allow_retry
+                ? route('courses.quizzes.show', [
+                    $courseId,
+                    $lessonId,
+                ]) . '?retry=1'
+                : null,
+            'certificate_url' => $certificateUrl,
+        ]);
+    }
+
+    $questions = $lesson->questions()
+        ->orderBy('order')
+        ->get()
+        ->map(function (Question $question) {
+            $options = $question->options ?? [];
+
+            return [
+                'id' => $question->id,
+                'title' => $question->title,
+                'type' => $question->type,
+                'points' => (int) $question->points,
+                'options' => array_values($options),
+            ];
+        })
+        ->values();
+
+    return response()->json([
+        'submitted' => false,
+        'allow_retry' => (bool) $lesson->allow_retry,
+        'questions' => $questions,
+        'total_score' => (int) $lesson->questions()->sum('points'),
+        'submit_url' => route('courses.quizzes.submit', [
             $courseId,
             $lessonId,
-            $viewer
-        );
+        ]),
+        'certificate_url' => $certificateUrl,
+    ]);
+}
 
+    /**
+ * Accept all answers together, score them on the server,
+ * and check certificate eligibility after saving the attempt.
+ */
+public function submit(
+    Request $request,
+    int $courseId,
+    int $lessonId
+): JsonResponse {
+    $viewer = $this->viewer();
+
+    [$course, $lesson] = $this->accessibleLesson(
+        $courseId,
+        $lessonId,
+        $viewer
+    );
+
+    $existing = QuizAttempt::where('user_id', $viewer->id)
+        ->where('lesson_id', $lesson->id)
+        ->first();
+
+    /*
+     * If already submitted and retries are disabled,
+     * return the saved result and check certificate eligibility.
+     */
+    if ($existing && ! $lesson->allow_retry) {
+        return response()->json([
+            'message' => 'This quiz has already been submitted.',
+            'submitted' => true,
+            'allow_retry' => false,
+            'result' => $this->resultData($existing, $lesson),
+            'certificate_url' => $this->certificateUrl(
+                (int) $viewer->id,
+                (int) $course->id
+            ),
+        ]);
+    }
+
+    $validated = $request->validate([
+        'answers' => ['required', 'array'],
+        'answers.*' => ['present', 'nullable'],
+    ]);
+
+    $questions = $lesson->questions()
+        ->orderBy('order')
+        ->get();
+
+    abort_if(
+        $questions->isEmpty(),
+        422,
+        'This quiz has no questions.'
+    );
+
+    $questionIds = $questions
+        ->pluck('id')
+        ->map(fn ($id) => (string) $id)
+        ->all();
+
+    $submittedAnswers = $validated['answers'];
+
+    // Reject answers for questions that do not belong to this quiz.
+    $extraIds = array_diff(
+        array_map('strval', array_keys($submittedAnswers)),
+        $questionIds
+    );
+
+    abort_if(
+        ! empty($extraIds),
+        422,
+        'Invalid question submitted.'
+    );
+
+    $score = 0;
+    $savedAnswers = [];
+
+    foreach ($questions as $question) {
+        $questionId = (string) $question->id;
+        $options = array_values($question->options ?? []);
+        $rawAnswer = $submittedAnswers[$questionId] ?? null;
+
+        if ($question->type === 'multiple_choice') {
+            abort_if(
+                $rawAnswer !== null && ! is_array($rawAnswer),
+                422,
+                'Invalid answer format.'
+            );
+
+            $selected = array_values(array_unique(array_map(
+                'intval',
+                $rawAnswer ?? []
+            )));
+
+            foreach ($selected as $index) {
+                abort_if(
+                    $index < 0 || $index >= count($options),
+                    422,
+                    'Invalid option selected.'
+                );
+            }
+
+            sort($selected);
+
+            $correct = array_values(array_unique(array_map(
+                'intval',
+                $question->correct_answers ?? []
+            )));
+
+            sort($correct);
+
+            $isCorrect = $selected === $correct;
+
+            $savedAnswers[$questionId] = $selected;
+        } else {
+            abort_if(
+                $rawAnswer !== null && ! is_scalar($rawAnswer),
+                422,
+                'Invalid answer format.'
+            );
+
+            $selected = ($rawAnswer === null || $rawAnswer === '')
+                ? null
+                : (int) $rawAnswer;
+
+            if ($selected !== null) {
+                abort_if(
+                    $selected < 0 || $selected >= count($options),
+                    422,
+                    'Invalid option selected.'
+                );
+            }
+
+            $correct = array_map(
+                'intval',
+                $question->correct_answers ?? []
+            );
+
+            $isCorrect = $selected !== null
+                && in_array($selected, $correct, true);
+
+            $savedAnswers[$questionId] = $selected;
+        }
+
+        if ($isCorrect) {
+            $score += (int) $question->points;
+        }
+    }
+
+    $totalScore = (int) $questions->sum('points');
+
+    $attributes = [
+        'score' => $score,
+        'total_score' => $totalScore,
+        'answers' => $savedAnswers,
+        'submitted_at' => now(),
+    ];
+
+    try {
+        if ($existing) {
+            // Update the existing attempt when retry is enabled.
+            $existing->update($attributes);
+            $attempt = $existing;
+        } else {
+            $attempt = QuizAttempt::create([
+                'user_id' => $viewer->id,
+                'lesson_id' => $lesson->id,
+                ...$attributes,
+            ]);
+        }
+    } catch (\Illuminate\Database\QueryException $exception) {
+        // Handle simultaneous submissions protected by a unique constraint.
         $attempt = QuizAttempt::where('user_id', $viewer->id)
             ->where('lesson_id', $lesson->id)
             ->first();
 
-        // A fresh attempt is only handed out when the admin allowed retries
-        // and the student explicitly asked to retake the quiz.
-        $wantsRetry = $attempt && $lesson->allow_retry && $request->boolean('retry');
-
-        if ($attempt && !$wantsRetry) {
-            return response()->json([
-                'submitted' => true,
-                'allow_retry' => (bool) $lesson->allow_retry,
-                'result' => $this->resultData($attempt, $lesson),
-                'retry_url' => $lesson->allow_retry
-                    ? route('courses.quizzes.show', [$courseId, $lessonId]) . '?retry=1'
-                    : null,
-            ]);
+        if (! $attempt) {
+            throw $exception;
         }
 
-        $questions = $lesson->questions()
-            ->orderBy('order')
-            ->get()
-            ->map(function (Question $question) {
-                $options = $question->options ?? [];
-
-                return [
-                    'id' => $question->id,
-                    'title' => $question->title,
-                    'type' => $question->type,
-                    'points' => (int) $question->points,
-                    'options' => array_values($options),
-                ];
-            })
-            ->values();
-
-        return response()->json([
-            'submitted' => false,
-            'allow_retry' => (bool) $lesson->allow_retry,
-            'questions' => $questions,
-            'total_score' => (int) $lesson->questions()->sum('points'),
-            'submit_url' => route('courses.quizzes.submit', [
-                $courseId,
-                $lessonId,
-            ]),
-        ]);
-    }
-
-    /**
-     * Accept all answers together and score them on the server.
-     */
-    public function submit(
-        Request $request,
-        int $courseId,
-        int $lessonId
-    ): JsonResponse {
-        $viewer = $this->viewer();
-
-        [, $lesson] = $this->accessibleLesson(
-            $courseId,
-            $lessonId,
-            $viewer
-        );
-
-        $existing = QuizAttempt::where('user_id', $viewer->id)
-            ->where('lesson_id', $lesson->id)
-            ->first();
-
-        if ($existing && !$lesson->allow_retry) {
+        if (! $lesson->allow_retry) {
             return response()->json([
                 'message' => 'This quiz has already been submitted.',
                 'submitted' => true,
                 'allow_retry' => false,
-                'result' => $this->resultData($existing, $lesson),
-            ], 409);
+                'result' => $this->resultData($attempt, $lesson),
+                'certificate_url' => $this->certificateUrl(
+                    (int) $viewer->id,
+                    (int) $course->id
+                ),
+            ]);
         }
 
-        $validated = $request->validate([
-            'answers' => ['required', 'array'],
-            'answers.*' => ['present'],
-            'answers.*' => ['nullable'],
-        ]);
-
-        $questions = $lesson->questions()
-            ->orderBy('order')
-            ->get();
-
-        abort_if($questions->isEmpty(), 422, 'This quiz has no questions.');
-
-        $questionIds = $questions->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        $submittedAnswers = $validated['answers'];
-
-        // Do not accept IDs for questions outside this quiz.
-        $extraIds = array_diff(
-            array_map('strval', array_keys($submittedAnswers)),
-            $questionIds
-        );
-
-        abort_if(
-            !empty($extraIds),
-            422,
-            'Invalid question submitted.'
-        );
-
-        $score = 0;
-        $savedAnswers = [];
-
-        foreach ($questions as $question) {
-            $questionId = (string) $question->id;
-            $options = array_values($question->options ?? []);
-            $rawAnswer = $submittedAnswers[$questionId] ?? null;
-
-            if ($question->type === 'multiple_choice') {
-                abort_if(
-                    $rawAnswer !== null && !is_array($rawAnswer),
-                    422,
-                    'Invalid answer format.'
-                );
-
-                $selected = array_values(array_unique(array_map(
-                    'intval',
-                    $rawAnswer ?? []
-                )));
-
-                foreach ($selected as $index) {
-                    abort_if(
-                        $index < 0 || $index >= count($options),
-                        422,
-                        'Invalid option selected.'
-                    );
-                }
-
-                sort($selected);
-
-                $correct = array_values(array_unique(array_map(
-                    'intval',
-                    $question->correct_answers ?? []
-                )));
-                sort($correct);
-
-                $isCorrect = $selected === $correct;
-
-                $savedAnswers[$questionId] = $selected;
-            } else {
-                abort_if(
-                    $rawAnswer !== null && !is_scalar($rawAnswer),
-                    422,
-                    'Invalid answer format.'
-                );
-
-                $selected = $rawAnswer === null || $rawAnswer === ''
-                    ? null
-                    : (int) $rawAnswer;
-
-                if ($selected !== null) {
-                    abort_if(
-                        $selected < 0 || $selected >= count($options),
-                        422,
-                        'Invalid option selected.'
-                    );
-                }
-
-                $correct = array_map(
-                    'intval',
-                    $question->correct_answers ?? []
-                );
-
-                $isCorrect = $selected !== null
-                    && in_array($selected, $correct, true);
-
-                $savedAnswers[$questionId] = $selected;
-            }
-
-            if ($isCorrect) {
-                $score += (int) $question->points;
-            }
-        }
-
-        $totalScore = (int) $questions->sum('points');
-
-        $attributes = [
-            'score' => $score,
-            'total_score' => $totalScore,
-            'answers' => $savedAnswers,
-            'submitted_at' => now(),
-        ];
-
-        try {
-            if ($existing) {
-                // Retry: overwrite the previous attempt with the new one.
-                $existing->update($attributes);
-                $attempt = $existing;
-            } else {
-                $attempt = QuizAttempt::create([
-                    'user_id' => $viewer->id,
-                    'lesson_id' => $lesson->id,
-                    ...$attributes,
-                ]);
-            }
-        } catch (QueryException $exception) {
-            // The database unique constraint handles simultaneous first-time submissions.
-            $attempt = QuizAttempt::where('user_id', $viewer->id)
-                ->where('lesson_id', $lesson->id)
-                ->first();
-
-            if (!$attempt) {
-                throw $exception;
-            }
-
-            if (!$lesson->allow_retry) {
-                return response()->json([
-                    'message' => 'This quiz has already been submitted.',
-                    'submitted' => true,
-                    'allow_retry' => false,
-                    'result' => $this->resultData($attempt, $lesson),
-                ], 409);
-            }
-
-            $attempt->update($attributes);
-        }
-
-        return response()->json([
-            'message' => 'Quiz submitted successfully.',
-            'submitted' => true,
-            'allow_retry' => (bool) $lesson->allow_retry,
-            'result' => $this->resultData($attempt, $lesson),
-        ]);
+        $attempt->update($attributes);
     }
+
+    /*
+     * The quiz attempt is saved. Now check whether every
+     * lesson in the course is complete and issue/reuse a certificate.
+     */
+    $certificateUrl = $this->certificateUrl(
+        (int) $viewer->id,
+        (int) $course->id
+    );
+
+    return response()->json([
+        'message' => 'Quiz submitted successfully.',
+        'submitted' => true,
+        'allow_retry' => (bool) $lesson->allow_retry,
+        'result' => $this->resultData($attempt, $lesson),
+        'certificate_url' => $certificateUrl,
+    ]);
+}
 
     private function resultData(QuizAttempt $attempt, Lesson $lesson): array
     {
@@ -337,4 +396,15 @@ class QuizController extends Controller
             'review' => $attempt->setRelation('lesson', $lesson)->review(),
         ];
     }
+    private function certificateUrl(int $userId, int $courseId): ?string
+{
+    $certificate = app(CertificateIssuanceService::class)
+        ->issueIfEligible($userId, $courseId);
+
+    if (! $certificate) {
+        return null;
+    }
+
+    return route('user.certificates.show', $certificate->id);
+}
 }
