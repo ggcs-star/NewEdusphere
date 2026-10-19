@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class Course extends Model
 {
     use HasFactory;
@@ -56,7 +56,13 @@ class Course extends Model
     {
         return $this->belongsTo(Category::class, 'category_id');
     }
-
+public function certificateTemplates(): BelongsToMany
+{
+    return $this->belongsToMany(
+        CertificateTemplate::class,
+        'certificate_template_course'
+    )->withTimestamps();
+}
     public function subCategory(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'sub_category_id');

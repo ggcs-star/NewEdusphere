@@ -7,9 +7,13 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\Certificate;
+use App\Services\CertificateIssuanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class MyCoursesController extends Controller
 {
@@ -62,6 +66,60 @@ class MyCoursesController extends Controller
             ->latest('id')
             ->paginate(9)
             ->withQueryString();
+
+        /*
+         * Fetch certificates for this user and the courses
+         * shown on the current page.
+         */
+        $courseIds = $courses->getCollection()->pluck('id');
+
+        $certificates = Certificate::query()
+            ->where('user_id', $user->id)
+            ->whereIn('course_id', $courseIds)
+            ->get()
+            ->keyBy('course_id');
+
+        /*
+         * Self-heal for students who finished before the certificate fix:
+         * for courses on this page that have no certificate yet, re-run the
+         * eligibility check. The service verifies enrollment, lessons,
+         * quizzes and template, and never duplicates a certificate.
+         * Failures are logged and never break the page.
+         * (Safe to remove once old students have been backfilled.)
+         */
+        $missing = $courseIds->diff($certificates->keys());
+
+        if ($missing->isNotEmpty()) {
+            $service = app(CertificateIssuanceService::class);
+
+            foreach ($missing as $missingCourseId) {
+                try {
+                    $service->issueIfEligible(
+                        (int) $user->id,
+                        (int) $missingCourseId
+                    );
+                } catch (Throwable $e) {
+                    Log::error('Certificate re-check failed on My Courses page', [
+                        'user_id' => $user->id,
+                        'course_id' => $missingCourseId,
+                        'exception' => $e,
+                    ]);
+                }
+            }
+
+            $certificates = Certificate::query()
+                ->where('user_id', $user->id)
+                ->whereIn('course_id', $courseIds)
+                ->get()
+                ->keyBy('course_id');
+        }
+
+        // Attach the certificate ID to its matching course.
+        $courses->getCollection()->each(function ($course) use ($certificates) {
+            $certificate = $certificates->get($course->id);
+
+            $course->certificate_id = $certificate?->id;
+        });
 
         // Summary cards are based on the current user's own records.
         $totalEnrollments = Enrollment::query()
