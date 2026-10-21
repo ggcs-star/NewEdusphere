@@ -117,10 +117,7 @@ Route::get('/home/course/{slug}/{id}', [
     'show',
 ])->whereNumber('id')->name('home.course.show');
 Route::get('/categories', function () {
-    $categories = Category::query()
-        ->withCount('children')
-        ->orderBy('name')
-        ->get();
+    $categories = app(\App\Services\CategoryCatalogService::class)->listCategories();
 
     return view('frontend.categories.index', compact('categories'));
 })->name('categories.index');

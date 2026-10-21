@@ -1,0 +1,617 @@
+{
+  "info": {
+    "_postman_id": "e8f2a1d0-5c3e-4b1a-9e2a-edusphere0001",
+    "name": "EduSphere API",
+    "description": "Auth (Passport) + Courses + Categories API for the EduSphere LMS.\n\n1. Set `base_url` in the collection variables (defaults to `http://127.0.0.1:8000` for `php artisan serve`).\n2. Run **Auth > Login (Admin)** or **Auth > Login (User)** first — the access token is captured automatically into `{{access_token}}` and reused by every other request's Bearer auth.\n3. Seeded accounts (see `database/seeders/AdminUserSeeder.php`):\n   - admin@example.com / 12345678 (role: admin)\n   - user@example.com / 12345678 (role: user)\n   - instructor@example.com / 12345678 (role: instructor)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000", "type": "string" },
+    { "key": "access_token", "value": "", "type": "string" },
+    { "key": "admin_token", "value": "", "type": "string" },
+    { "key": "user_token", "value": "", "type": "string" },
+    { "key": "course_slug", "value": "uiux-design-fundamentals", "type": "string" },
+    { "key": "course_id", "value": "9", "type": "string" },
+    { "key": "category_slug", "value": "design", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Student\",\n  \"email\": \"new.student@example.com\",\n  \"password\": \"12345678\",\n  \"password_confirmation\": \"12345678\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/register" },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Registration successful.\",\n  \"data\": {\n    \"user\": {\n      \"id\": 42,\n      \"name\": \"New Student\",\n      \"email\": \"new.student@example.com\",\n      \"role\": \"user\",\n      \"status\": 1\n    },\n    \"tokens\": {\n      \"token_type\": \"Bearer\",\n      \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    const token = json.data && json.data.tokens && json.data.tokens.access_token;",
+                  "    if (token) {",
+                  "        pm.collectionVariables.set('admin_token', token);",
+                  "        pm.collectionVariables.set('access_token', token);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"12345678\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/login" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"name\": \"Admin\",\n      \"email\": \"admin@example.com\",\n      \"role\": \"admin\",\n      \"status\": 1\n    },\n    \"tokens\": {\n      \"token_type\": \"Bearer\",\n      \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    const token = json.data && json.data.tokens && json.data.tokens.access_token;",
+                  "    if (token) {",
+                  "        pm.collectionVariables.set('user_token', token);",
+                  "        pm.collectionVariables.set('access_token', token);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"12345678\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/login" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": {\n      \"id\": 2,\n      \"name\": \"User\",\n      \"email\": \"user@example.com\",\n      \"role\": \"user\",\n      \"status\": 1\n    },\n    \"tokens\": {\n      \"token_type\": \"Bearer\",\n      \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/auth/me" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"User retrieved successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"name\": \"Admin\",\n      \"email\": \"admin@example.com\",\n      \"role\": \"admin\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"12345678\",\n  \"password\": \"newpassword123\",\n  \"password_confirmation\": \"newpassword123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/password/change",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "change"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/password/change" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/password/forgot",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "forgot"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/password/forgot" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"If the email is registered, a password reset link has been sent.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"token\": \"PASTE_TOKEN_FROM_EMAIL\",\n  \"password\": \"newpassword123\",\n  \"password_confirmation\": \"newpassword123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/password/reset",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "reset"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/password/reset" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password reset successfully.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "send"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/otp/send" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OTP sent successfully.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/otp/verify" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OTP verified successfully.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resend Email Verification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/email/resend",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "email", "resend"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/email/resend" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Verification email sent.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Email (link)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/email/verify?token=PASTE_TOKEN_FROM_EMAIL",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "email", "verify"],
+              "query": [{ "key": "token", "value": "PASTE_TOKEN_FROM_EMAIL" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Devices",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/devices",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "devices"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/auth/devices" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Devices retrieved successfully.\",\n  \"data\": {\n    \"devices\": []\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke Device",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"PASTE_DEVICE_ID\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/devices/revoke",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "devices", "revoke"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/devices/revoke" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Device revoked successfully.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login-history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login-history"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/auth/login-history" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Login history retrieved successfully.\",\n  \"data\": {\n    \"history\": [\n      {\n        \"id\": 1,\n        \"user_id\": 1,\n        \"success\": 1,\n        \"created_at\": \"2026-10-21 09:00:00\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/logout" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Logout successful.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout All",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout-all"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/auth/logout-all" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"All sessions have been logged out.\",\n  \"data\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Social Redirect (Google)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/social/google/redirect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "social", "google", "redirect"]
+            },
+            "description": "Browser-flow only — opens in a browser, not meant to be called as a JSON API request. Redirects to Google, then back to /api/v1/auth/social/google/callback."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Courses",
+      "item": [
+        {
+          "name": "List Courses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/courses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "courses"]
+            },
+            "description": "Public catalog — works without a token too (Authorization header is optional; a Passport token only adds enrollment-aware fields)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/courses" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"courses\": [\n      {\n        \"id\": 9,\n        \"slug\": \"uiux-design-fundamentals\",\n        \"title\": \"UI/UX Design Fundamentals\",\n        \"short_description\": \"Design beautiful, usable interfaces with Figma.\",\n        \"thumbnail_url\": \"http://127.0.0.1:8000/images/category-placeholder.svg\",\n        \"level\": \"beginner\",\n        \"language\": \"English\",\n        \"is_free\": false,\n        \"price\": 799,\n        \"discount_price\": null,\n        \"effective_price\": 799,\n        \"has_discount\": false,\n        \"discount_percent\": 0,\n        \"instructor\": { \"id\": 8, \"name\": \"Anuj Singh\", \"avatar_url\": null },\n        \"category\": { \"id\": 11, \"name\": \"Design\", \"slug\": \"design\", \"thumbnail_url\": \"http://127.0.0.1:8000/storage/categories/design.png\" },\n        \"sections_count\": 2,\n        \"lessons_count\": 4,\n        \"enrollments_count\": 1\n      }\n    ],\n    \"categories\": [\n      { \"id\": 11, \"name\": \"Design\", \"slug\": \"design\", \"thumbnail_url\": \"http://127.0.0.1:8000/storage/categories/design.png\", \"children_count\": null }\n    ],\n    \"pagination\": {\n      \"current_page\": 1,\n      \"last_page\": 1,\n      \"per_page\": 12,\n      \"total\": 3\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Courses (search + filters)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/courses?q=design&category=11&price=paid&per_page=6",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "courses"],
+              "query": [
+                { "key": "q", "value": "design" },
+                { "key": "category", "value": "11" },
+                { "key": "price", "value": "paid" },
+                { "key": "per_page", "value": "6" }
+              ]
+            },
+            "description": "q = search title/short_description. category = category or sub_category id. price = free | paid."
+          },
+          "response": []
+        },
+        {
+          "name": "Course Detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/courses/{{course_slug}}/{{course_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "courses", "{{course_slug}}", "{{course_id}}"]
+            },
+            "description": "Send a Bearer token to get real is_enrolled/is_unlocked/quiz_score_summary for that user. Without a token (or for a non-enrolled user) paid lessons come back with is_locked: true and no video_url."
+          },
+          "response": [
+            {
+              "name": "200 OK (guest / not enrolled)",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/courses/uiux-design-fundamentals/9" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"id\": 9,\n    \"slug\": \"uiux-design-fundamentals\",\n    \"title\": \"UI/UX Design Fundamentals\",\n    \"short_description\": \"Design beautiful, usable interfaces with Figma.\",\n    \"thumbnail_url\": \"http://127.0.0.1:8000/images/category-placeholder.svg\",\n    \"level\": \"beginner\",\n    \"language\": \"English\",\n    \"is_free\": false,\n    \"price\": 799,\n    \"discount_price\": null,\n    \"effective_price\": 799,\n    \"has_discount\": false,\n    \"discount_percent\": 0,\n    \"instructor\": { \"id\": 8, \"name\": \"Anuj Singh\", \"avatar_url\": null },\n    \"category\": { \"id\": 11, \"name\": \"Design\", \"slug\": \"design\", \"thumbnail_url\": \"http://127.0.0.1:8000/storage/categories/design.png\" },\n    \"enrollments_count\": 1,\n    \"description\": \"<p>Design beautiful, usable interfaces with Figma.</p>\",\n    \"outcomes\": [\"Understand core UX principles\", \"Create wireframes in Figma\"],\n    \"requirements\": [\"No design experience required\", \"A free Figma account\"],\n    \"preview_video_url\": \"https://www.youtube.com/watch?v=c9Wg6Cb_YlU\",\n    \"sub_category\": null,\n    \"sections\": [\n      {\n        \"id\": 23,\n        \"title\": \"UX Foundations\",\n        \"order\": 0,\n        \"lessons\": [\n          {\n            \"id\": 68,\n            \"title\": \"User Research Basics\",\n            \"lesson_type\": \"video\",\n            \"order\": 0,\n            \"duration\": \"11:13\",\n            \"total_score\": 0,\n            \"is_locked\": false,\n            \"video_type\": \"youtube\",\n            \"video_url\": \"https://www.youtube.com/embed/c9Wg6Cb_YlU\",\n            \"summary\": null,\n            \"questions_count\": null\n          },\n          {\n            \"id\": 70,\n            \"title\": \"Components & Variants\",\n            \"lesson_type\": \"video\",\n            \"order\": 0,\n            \"duration\": \"13:44\",\n            \"total_score\": 0,\n            \"is_locked\": true,\n            \"questions_count\": null\n          }\n        ]\n      }\n    ],\n    \"related_courses\": [],\n    \"is_enrolled\": false,\n    \"is_unlocked\": false,\n    \"preview_lesson_ids\": [68, 69],\n    \"quiz_score_summary\": null\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "categories"]
+            },
+            "description": "Active categories only, each with children_count. Add ?per_page=18 to paginate (same as the web /categories page); omit it to get the full list (e.g. for a filter dropdown)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/categories" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"categories\": [\n      {\n        \"id\": 11,\n        \"name\": \"Design\",\n        \"slug\": \"design\",\n        \"thumbnail_url\": \"http://127.0.0.1:8000/storage/categories/design.png\",\n        \"children_count\": 0\n      },\n      {\n        \"id\": 6,\n        \"name\": \"Java\",\n        \"slug\": \"java\",\n        \"thumbnail_url\": \"http://127.0.0.1:8000/images/category-placeholder.svg\",\n        \"children_count\": 1\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Category Detail (with courses)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/categories/{{category_slug}}?price=paid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "categories", "{{category_slug}}"],
+              "query": [{ "key": "price", "value": "paid", "disabled": true }]
+            },
+            "description": "Category + its active courses (matches category_id or sub_category_id). Supports the same q / price / per_page query params as List Courses."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/categories/design" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"id\": 11,\n    \"name\": \"Design\",\n    \"slug\": \"design\",\n    \"thumbnail_url\": \"http://127.0.0.1:8000/storage/categories/design.png\",\n    \"children_count\": 0,\n    \"courses\": [\n      {\n        \"id\": 9,\n        \"slug\": \"uiux-design-fundamentals\",\n        \"title\": \"UI/UX Design Fundamentals\",\n        \"is_free\": false,\n        \"price\": 799,\n        \"instructor\": { \"id\": 8, \"name\": \"Anuj Singh\", \"avatar_url\": null },\n        \"category\": { \"id\": 11, \"name\": \"Design\", \"slug\": \"design\", \"thumbnail_url\": \"http://127.0.0.1:8000/storage/categories/design.png\" }\n      }\n    ],\n    \"pagination\": {\n      \"current_page\": 1,\n      \"last_page\": 1,\n      \"per_page\": 12,\n      \"total\": 1\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
