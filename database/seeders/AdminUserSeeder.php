@@ -19,11 +19,29 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         User::updateOrCreate(
-            ['email' => 'admin@edusphere.test'],
+            ['email' => 'admin@example.com'],
             [
                 'name' => 'Admin',
-                'password' => Hash::make('Admin@123'),
+                'password' => Hash::make('12345678'),
                 'role' => 'admin',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'user@example.com'],
+            [
+                'name' => 'User',
+                'password' => Hash::make('12345678'),
+                'role' => 'user',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'instructor@example.com'],
+            [
+                'name' => 'Instructor',
+                'password' => Hash::make('12345678'),
+                'role' => 'instructor',
             ]
         );
     }
