@@ -30,7 +30,6 @@ use App\Http\Controllers\Frontend\QuizController;
 use App\Http\Controllers\Admin\CertificateTemplateController;
 
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -117,10 +116,7 @@ Route::get('/home/course/{slug}/{id}', [
     'show',
 ])->whereNumber('id')->name('home.course.show');
 Route::get('/categories', function () {
-    $categories = Category::query()
-        ->withCount('children')
-        ->orderBy('name')
-        ->get();
+    $categories = app(\App\Services\CategoryCatalogService::class)->listCategories();
 
     return view('frontend.categories.index', compact('categories'));
 })->name('categories.index');
@@ -223,7 +219,7 @@ Route::post('/web/session', [
 Route::middleware('web.auth')->group(function () {
 
     // User dashboard.
-    Route::get('/dashboard', function () {
+    Route::get('/dashboard', function (\App\Services\MyCoursesService $myCourses) {
         $user = current_admin_user();
 
         if ($user?->role === 'admin') {
@@ -234,32 +230,13 @@ Route::middleware('web.auth')->group(function () {
             return redirect()->route('instructor.dashboard');
         }
 
-        if ($user?->is_instructor) {
-            return redirect()->route('instructor.dashboard');
-        }
+        $summary = $user ? $myCourses->dashboardSummary($user) : ['courses' => collect(), 'enrolled_count' => 0];
 
-        $userId = $user?->id;
-
-        $enrolledIds = $userId
-            ? DB::table('enrollments')
-                ->where('user_id', $userId)
-                ->pluck('course_id')
-            : collect();
-
-        $courses = $enrolledIds->isNotEmpty()
-            ? Course::with(['instructor', 'category'])
-                ->whereIn('id', $enrolledIds)
-                ->latest()
-                ->take(6)
-                ->get()
-            : collect();
-
-        $enrolledCount = $enrolledIds->count();
-
-        return view(
-            'frontend.dashboard.index',
-            compact('user', 'courses', 'enrolledCount')
-        );
+        return view('frontend.dashboard.index', [
+            'user' => $user,
+            'courses' => $summary['courses'],
+            'enrolledCount' => $summary['enrolled_count'],
+        ]);
     })->name('dashboard');
 
     Route::get('/me', [
@@ -321,15 +298,12 @@ Route::get('/my-certificates/{certificate}', [
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/purchase-history', function () {
+    Route::get('/purchase-history', function (\App\Services\MyCoursesService $myCourses) {
         $user = current_admin_user();
 
         abort_unless($user, 403);
 
-   $payments = DB::table('payments')
-    ->where('user_id', $user->id)
-->orderByDesc('id')
-    ->get();
+        $payments = $myCourses->purchaseHistory($user);
 
         return view(
             'frontend.purchase-history.index',

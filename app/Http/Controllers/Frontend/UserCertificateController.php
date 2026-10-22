@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Frontend;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\User;
+use App\Services\StudentCertificateService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class UserCertificateController extends Controller
 {
+    public function __construct(private readonly StudentCertificateService $certificates)
+    {
+    }
+
     /**
      * Students log in through the custom session (`user` / `user_token`),
      * exactly like the other frontend controllers. The old version only
@@ -40,10 +45,7 @@ class UserCertificateController extends Controller
 
         abort_unless($user && $user->id, 401);
 
-        $certificates = Certificate::with(['course', 'template'])
-            ->where('user_id', $user->id)
-            ->latest('issued_at')
-            ->paginate(9);
+        $certificates = $this->certificates->listFor($user);
 
         return view('frontend.certificates.index', compact(
             'user',
@@ -57,13 +59,7 @@ class UserCertificateController extends Controller
 
         abort_unless($user && $user->id, 401);
 
-        // Students can only open their own certificates.
-        abort_unless(
-            (int) $certificate->user_id === (int) $user->id,
-            403
-        );
-
-        $certificate->load(['course', 'template', 'user']);
+        $certificate = $this->certificates->findOwned($user, $certificate->id);
 
         return view('frontend.certificates.show', compact(
             'user',

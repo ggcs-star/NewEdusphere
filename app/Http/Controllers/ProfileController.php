@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FileUploadService;
+use App\Services\ProfileService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-    public function __construct(private readonly FileUploadService $uploads)
+    public function __construct(private readonly ProfileService $profile)
     {
     }
 
@@ -51,29 +50,7 @@ class ProfileController extends Controller
             'new_password' => ['nullable', 'confirmed', 'min:8'],
         ]);
 
-        if (! empty($validated['new_password']) && ! Hash::check($validated['current_password'], $user->password)) {
-            return back()
-                ->withErrors(['current_password' => 'Your current password is incorrect.'])
-                ->withInput();
-        }
-
-        $user->name = $validated['name'];
-        $user->phone = $validated['phone'] ?? null;
-        $user->biography = $validated['biography'] ?? null;
-        $user->short_title = $validated['short_title'] ?? null;
-        $user->facebook_link = $validated['facebook_link'] ?? null;
-        $user->twitter_link = $validated['twitter_link'] ?? null;
-        $user->linkedin_link = $validated['linkedin_link'] ?? null;
-
-        if ($request->hasFile('avatar')) {
-            $user->avatar = $this->uploads->replace($user->avatar, $request->file('avatar'), 'avatars');
-        }
-
-        if (! empty($validated['new_password'])) {
-            $user->password = Hash::make($validated['new_password']);
-        }
-
-        $user->save();
+        $user = $this->profile->update($user, $validated, $request->file('avatar'));
 
         // current_admin_user() reads session('user') directly rather than
         // re-querying the DB, so the session copy has to be refreshed here
