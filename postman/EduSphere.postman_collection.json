@@ -612,6 +612,355 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Cart",
+      "description": "Persistent per-user cart (DB-backed, not the web session cart) — requires a Bearer token.",
+      "item": [
+        {
+          "name": "View Cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/cart", "host": ["{{base_url}}"], "path": ["api", "v1", "cart"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/cart" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"items\": [\n      {\n        \"course\": { \"id\": 9, \"slug\": \"uiux-design-fundamentals\", \"title\": \"UI/UX Design Fundamentals\", \"is_free\": false, \"price\": 799, \"effective_price\": 799 },\n        \"price\": 799\n      }\n    ],\n    \"subtotal\": 799,\n    \"count\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add To Cart",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/cart/add/{{course_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "cart", "add", "{{course_id}}"]
+            },
+            "description": "Admins/instructors get 403 \"... cannot purchase courses.\" — only role=user may add to cart."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/cart/add/9" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Course added to your cart.\",\n  \"data\": { \"items\": [ { \"course\": { \"id\": 9, \"title\": \"UI/UX Design Fundamentals\" }, \"price\": 799 } ], \"subtotal\": 799, \"count\": 1 }\n}"
+            },
+            {
+              "name": "403 Forbidden (admin/instructor)",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/cart/add/9" },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Admins cannot purchase courses.\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Remove From Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/cart/remove/{{course_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "cart", "remove", "{{course_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/cart/clear", "host": ["{{base_url}}"], "path": ["api", "v1", "cart", "clear"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "DELETE", "url": "{{base_url}}/api/v1/cart/clear" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Cart cleared.\",\n  \"data\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "description": "Backed by CheckoutService (Razorpay). course_ids is optional on Pay — omit it to check out whatever is currently in the DB cart.",
+      "item": [
+        {
+          "name": "Preview",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "body": { "mode": "raw", "raw": "{\n  \"course_ids\": [{{course_id}}]\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/checkout/preview", "host": ["{{base_url}}"], "path": ["api", "v1", "checkout", "preview"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/checkout/preview" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": { \"items\": [ { \"course\": { \"id\": 9, \"title\": \"UI/UX Design Fundamentals\" }, \"price\": 799 } ], \"subtotal\": 799 }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Pay",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "body": { "mode": "raw", "raw": "{\n  \"course_ids\": [{{course_id}}]\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/checkout/pay", "host": ["{{base_url}}"], "path": ["api", "v1", "checkout", "pay"] },
+            "description": "Free courses (or already-fully-discounted carts) enroll immediately with no gateway involved. Paid courses return a Razorpay order to complete client-side, then call Verify."
+          },
+          "response": [
+            {
+              "name": "200 OK (free course → enrolled immediately)",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/checkout/pay" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"You are enrolled successfully.\",\n  \"data\": null\n}"
+            },
+            {
+              "name": "200 OK (paid course → Razorpay order created)",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/checkout/pay" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Razorpay order created. Complete payment then call /checkout/verify.\",\n  \"data\": {\n    \"razorpay_key\": \"rzp_test_xxx\",\n    \"order_id\": \"order_xxx\",\n    \"amount\": 79900,\n    \"currency\": \"INR\",\n    \"name\": \"User\",\n    \"email\": \"user@example.com\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"\",\n  \"razorpay_payment_id\": \"\",\n  \"razorpay_signature\": \"\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/checkout/verify", "host": ["{{base_url}}"], "path": ["api", "v1", "checkout", "verify"] },
+            "description": "Call this with the values Razorpay's checkout.js returns after the user pays the order from Pay."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/checkout/verify" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment verified successfully. Your courses are now available.\",\n  \"data\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "My Courses",
+      "item": [
+        {
+          "name": "My Courses (list)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/my-courses", "host": ["{{base_url}}"], "path": ["api", "v1", "my-courses"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/my-courses" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"courses\": [],\n    \"pagination\": { \"current_page\": 1, \"last_page\": 1, \"per_page\": 9, \"total\": 0 },\n    \"summary\": { \"total_enrollments\": 0, \"total_spent\": 0, \"successful_payments\": 0 }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/dashboard", "host": ["{{base_url}}"], "path": ["api", "v1", "dashboard"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/dashboard" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": { \"recent_courses\": [], \"enrolled_count\": 0 }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Purchase History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/my-courses/purchase-history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "my-courses", "purchase-history"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/my-courses/purchase-history" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Certificates",
+      "item": [
+        {
+          "name": "List My Certificates",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/certificates", "host": ["{{base_url}}"], "path": ["api", "v1", "certificates"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/certificates" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"certificates\": [],\n    \"pagination\": { \"current_page\": 1, \"last_page\": 1, \"per_page\": 9, \"total\": 0 }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Certificate Detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/certificates/1", "host": ["{{base_url}}"], "path": ["api", "v1", "certificates", "1"] },
+            "description": "403 if the certificate id belongs to a different user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "My Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/profile", "host": ["{{base_url}}"], "path": ["api", "v1", "profile"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "GET", "url": "{{base_url}}/api/v1/profile" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": { \"id\": 22, \"name\": \"User\", \"email\": \"user@example.com\", \"role\": \"user\", \"phone\": null, \"biography\": null, \"short_title\": null, \"avatar_url\": null, \"social_links\": [] }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "User", "type": "text" },
+                { "key": "short_title", "value": "Lifelong Learner", "type": "text" },
+                { "key": "biography", "value": "", "type": "text", "disabled": true },
+                { "key": "current_password", "value": "", "type": "text", "disabled": true },
+                { "key": "new_password", "value": "", "type": "text", "disabled": true },
+                { "key": "new_password_confirmation", "value": "", "type": "text", "disabled": true },
+                { "key": "avatar", "type": "file", "src": [], "disabled": true }
+              ]
+            },
+            "url": { "raw": "{{base_url}}/api/v1/profile", "host": ["{{base_url}}"], "path": ["api", "v1", "profile"] },
+            "description": "multipart/form-data so the (optional, currently disabled) avatar file upload works. To change password, fill current_password + new_password + new_password_confirmation."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/profile" },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully.\",\n  \"data\": { \"id\": 22, \"name\": \"User\", \"email\": \"user@example.com\", \"role\": \"user\", \"short_title\": \"Lifelong Learner\", \"avatar_url\": null, \"social_links\": [] }\n}"
+            },
+            {
+              "name": "422 Unprocessable (wrong current_password)",
+              "originalRequest": { "method": "POST", "url": "{{base_url}}/api/v1/profile" },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Your current password is incorrect.\",\n  \"errors\": { \"current_password\": [\"Your current password is incorrect.\"] }\n}"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
